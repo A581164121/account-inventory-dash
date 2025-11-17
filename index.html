@@ -1,19 +1,18 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AcctPro - Accounting & Inventory ERP</title>
+    <title>Accounting ERP</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
             colors: {
-              'primary': '#4f46e5',
-              'secondary': '#10b981',
+              'primary': 'var(--color-primary, #4f46e5)',
+              'secondary': 'var(--color-secondary, #10b981)',
               'light': '#f3f4f6',
               'dark': '#111827',
               'dark-secondary': '#1f2937',
@@ -22,6 +21,35 @@
         }
       }
     </script>
+    <style>
+      @media print {
+        body {
+          background-color: white !important;
+          color: black !important;
+        }
+        .no-print, .no-print * {
+          display: none !important;
+        }
+        main {
+          overflow: visible !important;
+        }
+        .printable-content {
+          box-shadow: none !important;
+          border: none !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        .printable-area, .printable-area * {
+            visibility: visible;
+        }
+        .printable-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+      }
+    </style>
   <script type="importmap">
 {
   "imports": {
@@ -30,7 +58,9 @@
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0"
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "jspdf": "https://aistudiocdn.com/jspdf@^2.5.1",
+    "html2canvas": "https://aistudiocdn.com/html2canvas@^1.4.1"
   }
 }
 </script>

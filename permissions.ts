@@ -1,0 +1,96 @@
+
+import { UserRole, Permission } from './types';
+
+export const ALL_PERMISSIONS = Object.values(Permission);
+
+export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+  [UserRole.SUPER_ADMIN]: ALL_PERMISSIONS, // Super Admin has all permissions implicitly
+  [UserRole.ADMIN]: [
+    Permission.VIEW_DASHBOARD,
+    Permission.ACCESS_ADMIN_PANEL,
+    Permission.MANAGE_USERS,
+    Permission.MANAGE_ROLES,
+    Permission.VIEW_ACTIVITY_LOG,
+    Permission.MANAGE_BRANDING,
+    Permission.APPROVE_DELETE_CUSTOMER,
+    Permission.APPROVE_DELETE_SALE,
+    Permission.APPROVE_DELETE_PURCHASE,
+    Permission.APPROVE_DELETE_JOURNAL_ENTRY,
+    Permission.APPROVE_DELETE_EXPENSE,
+    Permission.APPROVE_JOURNAL_ENTRY,
+    Permission.APPROVE_PURCHASE,
+    Permission.APPROVE_SALE_EDIT,
+    // Can also view everything
+    ...Object.values(Permission).filter(p => p.startsWith('VIEW_')),
+  ],
+  [UserRole.SALES_MANAGER]: [
+    Permission.VIEW_DASHBOARD,
+    Permission.CREATE_SALE,
+    Permission.VIEW_SALE,
+    Permission.EDIT_SALE,
+    Permission.REQUEST_DELETE_SALE,
+    Permission.APPROVE_SALE_EDIT,
+    Permission.CREATE_CUSTOMER,
+    Permission.VIEW_CUSTOMER,
+    Permission.EDIT_CUSTOMER,
+    Permission.REQUEST_DELETE_CUSTOMER,
+  ],
+  [UserRole.SALES_ASSISTANT]: [
+    Permission.VIEW_DASHBOARD,
+    Permission.CREATE_SALE,
+    Permission.VIEW_SALE,
+    Permission.EDIT_SALE,
+    Permission.REQUEST_DELETE_SALE,
+    Permission.CREATE_CUSTOMER,
+    Permission.VIEW_CUSTOMER,
+    Permission.EDIT_CUSTOMER,
+  ],
+  [UserRole.SALES_STAFF]: [
+    Permission.VIEW_DASHBOARD,
+    Permission.CREATE_SALE,
+    Permission.VIEW_SALE,
+    Permission.REQUEST_DELETE_SALE,
+    Permission.CREATE_CUSTOMER,
+    Permission.VIEW_CUSTOMER,
+  ],
+  [UserRole.PURCHASE_MANAGER]: [
+    Permission.VIEW_DASHBOARD,
+    Permission.CREATE_PURCHASE,
+    Permission.VIEW_PURCHASE,
+    Permission.EDIT_PURCHASE,
+    Permission.REQUEST_DELETE_PURCHASE,
+    Permission.APPROVE_PURCHASE,
+  ],
+  [UserRole.PURCHASE_ASSISTANT]: [
+    Permission.VIEW_DASHBOARD,
+    Permission.CREATE_PURCHASE,
+    Permission.VIEW_PURCHASE,
+    Permission.EDIT_PURCHASE,
+    Permission.REQUEST_DELETE_PURCHASE,
+  ],
+  [UserRole.PURCHASE_STAFF]: [
+    Permission.VIEW_DASHBOARD,
+    Permission.CREATE_PURCHASE,
+    Permission.VIEW_PURCHASE,
+    Permission.REQUEST_DELETE_PURCHASE,
+  ],
+  [UserRole.ACCOUNTS_MANAGER]: [
+    Permission.VIEW_DASHBOARD,
+    Permission.CREATE_JOURNAL_ENTRY,
+    Permission.VIEW_JOURNAL_ENTRY,
+    Permission.APPROVE_JOURNAL_ENTRY,
+    Permission.REQUEST_DELETE_JOURNAL_ENTRY,
+    Permission.CREATE_EXPENSE,
+    Permission.VIEW_EXPENSE,
+    Permission.EDIT_EXPENSE,
+    Permission.REQUEST_DELETE_EXPENSE,
+  ],
+  [UserRole.GENERAL_LEDGER_STAFF]: [
+    Permission.VIEW_DASHBOARD,
+    Permission.CREATE_JOURNAL_ENTRY,
+    Permission.VIEW_JOURNAL_ENTRY,
+    Permission.CREATE_EXPENSE,
+    Permission.VIEW_EXPENSE,
+  ],
+  [UserRole.CUSTOM]: [], // Custom role starts with no permissions
+};

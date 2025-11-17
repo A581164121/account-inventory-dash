@@ -1,8 +1,8 @@
-
 import React from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateTrialBalance } from '../services/accountingService';
 import { Printer, FileDown } from 'lucide-react';
+import { exportToCsv, exportToPdf } from '../services/exportService';
 
 const TrialBalance: React.FC = () => {
     const appState = useAppContext();
@@ -11,24 +11,40 @@ const TrialBalance: React.FC = () => {
 
     const totalDebits = trialBalanceData.reduce((sum, item) => sum + item.debit, 0);
     const totalCredits = trialBalanceData.reduce((sum, item) => sum + item.credit, 0);
+    
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const handleExportCsv = () => {
+        exportToCsv(trialBalanceData, `trial_balance_${new Date().toISOString().split('T')[0]}`);
+    };
+    
+    const handleExportPdf = () => {
+        exportToPdf('trial-balance-report', `trial_balance_${new Date().toISOString().split('T')[0]}`);
+    };
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-6 no-print">
                 <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Trial Balance</h1>
                 <div className="flex space-x-2">
-                    <button className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-gray-300 dark:hover:bg-gray-600">
+                    <button onClick={handlePrint} className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-gray-300 dark:hover:bg-gray-600">
                         <Printer size={20} />
                         <span>Print</span>
                     </button>
-                    <button className="bg-secondary text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-emerald-600">
+                    <button onClick={handleExportPdf} className="bg-primary text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-indigo-700">
+                        <FileDown size={20} />
+                        <span>Export PDF</span>
+                    </button>
+                    <button onClick={handleExportCsv} className="bg-secondary text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-emerald-600">
                         <FileDown size={20} />
                         <span>Export CSV</span>
                     </button>
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-dark-secondary p-6 rounded-lg shadow-md">
+            <div id="trial-balance-report" className="bg-white dark:bg-dark-secondary p-6 rounded-lg shadow-md printable-content">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead>

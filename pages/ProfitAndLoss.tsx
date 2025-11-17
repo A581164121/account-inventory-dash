@@ -1,30 +1,38 @@
-
 import React from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateProfitAndLoss } from '../services/accountingService';
 import { Printer, FileDown } from 'lucide-react';
+import { exportToPdf } from '../services/exportService';
 
 const ProfitAndLoss: React.FC = () => {
     const appState = useAppContext();
     const plData = generateProfitAndLoss(appState);
     const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const handleExportPdf = () => {
+        exportToPdf('pl-report', `profit_and_loss_${new Date().toISOString().split('T')[0]}`);
+    };
+
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-6 no-print">
                 <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Profit & Loss Statement</h1>
                  <div className="flex space-x-2">
-                    <button className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-gray-300 dark:hover:bg-gray-600">
+                    <button onClick={handlePrint} className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-gray-300 dark:hover:bg-gray-600">
                         <Printer size={20} />
                         <span>Print</span>
                     </button>
-                    <button className="bg-secondary text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-emerald-600">
+                    <button onClick={handleExportPdf} className="bg-primary text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-indigo-700">
                         <FileDown size={20} />
                         <span>Export PDF</span>
                     </button>
                 </div>
             </div>
-             <div className="bg-white dark:bg-dark-secondary p-8 rounded-lg shadow-md">
+             <div id="pl-report" className="bg-white dark:bg-dark-secondary p-8 rounded-lg shadow-md printable-content">
                 <div className="mb-6">
                     <h2 className="text-xl font-semibold mb-2">Revenue</h2>
                     <div className="flex justify-between py-2 border-b dark:border-gray-700">
