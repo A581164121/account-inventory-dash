@@ -1,6 +1,13 @@
 
 import { Customer, Supplier, Product, Sale, Purchase, Expense, JournalEntry, Account, User, Department, UserRole } from '../types';
 
+// IMPORTANT: This is a frontend simulation of password hashing.
+// In a real application, you would use a library like bcrypt on the server.
+// DO NOT use this approach in production.
+const FAKE_SALT = 'a_very_salty_salt_string';
+const fakeHash = (password: string): string => `bcrypt_sim_${password}_${FAKE_SALT}`;
+
+
 export const MOCK_DEPARTMENTS: Department[] = [
     { id: 'DEPT-01', name: 'Sales' },
     { id: 'DEPT-02', name: 'Purchases' },
@@ -10,14 +17,15 @@ export const MOCK_DEPARTMENTS: Department[] = [
 ];
 
 export const MOCK_USERS: User[] = [
-    { id: 'USER-01', name: 'Alice (Super Admin)', email: 'alice@example.com', role: UserRole.SUPER_ADMIN, departmentId: 'DEPT-05', isActive: true },
-    { id: 'USER-02', name: 'Bob (Admin)', email: 'bob@example.com', role: UserRole.ADMIN, departmentId: 'DEPT-05', isActive: true },
-    { id: 'USER-03', name: 'Charlie (Sales Manager)', email: 'charlie@example.com', role: UserRole.SALES_MANAGER, departmentId: 'DEPT-01', isActive: true },
-    { id: 'USER-04', name: 'David (Sales Staff)', email: 'david@example.com', role: UserRole.SALES_STAFF, departmentId: 'DEPT-01', isActive: true },
-    { id: 'USER-05', name: 'Eve (Purchase Manager)', email: 'eve@example.com', role: UserRole.PURCHASE_MANAGER, departmentId: 'DEPT-02', isActive: true },
-    { id: 'USER-06', name: 'Frank (Purchase Staff)', email: 'frank@example.com', role: UserRole.PURCHASE_STAFF, departmentId: 'DEPT-02', isActive: true },
-    { id: 'USER-07', name: 'Grace (Accounts Manager)', email: 'grace@example.com', role: UserRole.ACCOUNTS_MANAGER, departmentId: 'DEPT-03', isActive: true },
-    { id: 'USER-08', name: 'Heidi (GL Staff)', email: 'heidi@example.com', role: UserRole.GENERAL_LEDGER_STAFF, departmentId: 'DEPT-03', isActive: true },
+    { id: 'USER-01', name: 'Alice (Super Admin)', email: 'alice@example.com', passwordHash: fakeHash('123456'), role: UserRole.SUPER_ADMIN, departmentId: 'DEPT-05', isActive: true, createdAt: '2023-01-01T10:00:00Z' },
+    { id: 'USER-02', name: 'Bob (Admin)', email: 'bob@example.com', passwordHash: fakeHash('123456'), role: UserRole.ADMIN, departmentId: 'DEPT-05', isActive: true, createdAt: '2023-01-02T10:00:00Z' },
+    { id: 'USER-03', name: 'Charlie (Sales Manager)', email: 'charlie@example.com', passwordHash: fakeHash('password'), role: UserRole.SALES_MANAGER, departmentId: 'DEPT-01', isActive: true, createdAt: '2023-01-03T10:00:00Z' },
+    { id: 'USER-04', name: 'David (Sales Staff)', email: 'david@example.com', passwordHash: fakeHash('password'), role: UserRole.SALES_STAFF, departmentId: 'DEPT-01', isActive: true, createdAt: '2023-01-04T10:00:00Z' },
+    { id: 'USER-05', name: 'Eve (Purchase Manager)', email: 'eve@example.com', passwordHash: fakeHash('password'), role: UserRole.PURCHASE_MANAGER, departmentId: 'DEPT-02', isActive: true, createdAt: '2023-01-05T10:00:00Z' },
+    { id: 'USER-06', name: 'Frank (Purchase Staff)', email: 'frank@example.com', passwordHash: fakeHash('password'), role: UserRole.PURCHASE_STAFF, departmentId: 'DEPT-02', isActive: true, createdAt: '2023-01-06T10:00:00Z' },
+    { id: 'USER-07', name: 'Grace (Accounts Manager)', email: 'grace@example.com', passwordHash: fakeHash('password'), role: UserRole.ACCOUNTS_MANAGER, departmentId: 'DEPT-03', isActive: true, createdAt: '2023-01-07T10:00:00Z' },
+    { id: 'USER-08', name: 'Heidi (GL Staff)', email: 'heidi@example.com', passwordHash: fakeHash('password'), role: UserRole.GENERAL_LEDGER_STAFF, departmentId: 'DEPT-03', isActive: false, createdAt: '2023-01-08T10:00:00Z' },
+    { id: 'USER-09', name: 'Muhammad Akbar', email: 'infolmakbar@gmail.com', passwordHash: fakeHash('123456'), role: UserRole.CUSTOM, departmentId: 'DEPT-01', isActive: true, createdAt: '2023-01-09T10:00:00Z' },
 ];
 
 

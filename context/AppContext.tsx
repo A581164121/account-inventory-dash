@@ -1,6 +1,8 @@
+
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { Customer, Supplier, Product, Sale, Purchase, Expense, JournalEntry, Account, User, Department, ActivityLog, ApprovalRequest, RecordType, ApprovalStatus, RecordStatus, ThemeColors, CompanyProfile } from '../types';
-import { MOCK_CUSTOMERS, MOCK_SUPPLIERS, MOCK_PRODUCTS, MOCK_SALES, MOCK_PURCHASES, MOCK_EXPENSES, MOCK_JOURNAL_ENTRIES, MOCK_ACCOUNTS, MOCK_USERS, MOCK_DEPARTMENTS } from '../data/mockData';
+import { MOCK_CUSTOMERS, MOCK_SUPPLIERS, MOCK_PRODUCTS, MOCK_SALES, MOCK_PURCHASES, MOCK_EXPENSES, MOCK_JOURNAL_ENTRIES, MOCK_ACCOUNTS, MOCK_DEPARTMENTS } from '../data/mockData';
+import { useAuth } from './auth';
 
 const defaultTheme: ThemeColors = {
   primary: '#4f46e5',
@@ -24,7 +26,7 @@ interface AppContextType {
   expenses: Expense[];
   journalEntries: JournalEntry[];
   accounts: Account[];
-  users: User[];
+  users: Omit<User, 'passwordHash'>[];
   departments: Department[];
   activityLog: ActivityLog[];
   approvalRequests: ApprovalRequest[];
@@ -37,8 +39,10 @@ interface AppContextType {
   setCompanyProfile: (profile: CompanyProfile) => void;
 
   // User Management
-  addUser: (user: Omit<User, 'id'>) => void;
-  updateUser: (user: User) => void;
+  addUser: (user: Omit<User, 'id' | 'passwordHash' | 'createdAt'>, password: string) => User;
+  updateUser: (user: Omit<User, 'passwordHash'>) => void;
+  resetUserPassword: (userId: string, newPassword: string) => void;
+
 
   addCustomer: (customer: Omit<Customer, 'id' | 'status'>, userId: string) => void;
   updateCustomer: (customer: Customer, userId: string) => void;
@@ -68,6 +72,8 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const auth = useAuth();
+  
   // Main Data State
   const [customers, setCustomers] = useState<Customer[]>(MOCK_CUSTOMERS);
   const [suppliers, setSuppliers] = useState<Supplier[]>(MOCK_SUPPLIERS);
@@ -78,9 +84,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>(MOCK_JOURNAL_ENTRIES);
   const [accounts, setAccounts] = useState<Account[]>(MOCK_ACCOUNTS);
 
-  // Admin & Workflow State
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
-  const [departments, setDepartments] = useState<Department[]>(MOCK_DEPARTMENTS);
+  // Admin & Workflow State (Departments are static for now)
+  const [departments] = useState<Department[]>(MOCK_DEPARTMENTS);
   const [activityLog, setActivityLog] = useState<ActivityLog[]>([]);
   const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
   
@@ -137,12 +142,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setActivityLog(prev => [newLog, ...prev]);
   };
   
-  // User Management
-  const addUser = (user: Omit<User, 'id'>) => {
-    setUsers(prev => [...prev, { ...user, id: `USER-${Date.now()}` }]);
+  // User Management Wrappers (integrate with AuthContext and add logging)
+  const addUser = (user: Omit<User, 'id' | 'passwordHash' | 'createdAt'>, password: string): User => {
+    if (!auth.currentUser) throw new Error("Authentication error");
+    const newUser = auth.addUser(user, password);
+    logActivity(auth.currentUser.id, 'Create User', `Created new user: ${newUser.name} (${newUser.email})`);
+    return newUser;
   };
-  const updateUser = (updatedUser: User) => {
-    setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+
+  const updateUser = (updatedUser: Omit<User, 'passwordHash'>) => {
+    if (!auth.currentUser) throw new Error("Authentication error");
+    auth.updateUser(updatedUser);
+    logActivity(auth.currentUser.id, 'Update User', `Updated user details for: ${updatedUser.name} (ID: ${updatedUser.id})`);
+  };
+
+  const resetUserPassword = (userId: string, newPassword: string) => {
+    if (!auth.currentUser) throw new Error("Authentication error");
+    const targetUser = auth.users.find(u => u.id === userId);
+    auth.resetUserPassword(userId, newPassword);
+    logActivity(auth.currentUser.id, 'Reset Password', `Reset password for user: ${targetUser?.name || 'Unknown'} (ID: ${userId})`);
   };
 
   // Internal Delete Functions (only called by approval workflow)
@@ -296,9 +314,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const value = {
     customers, suppliers, products, sales, purchases, expenses, journalEntries, accounts,
-    users, departments, activityLog, approvalRequests,
+    users: auth.users.map(({ passwordHash, ...user }) => user), // Provide users without password hash
+    departments, activityLog, approvalRequests,
     logoUrl, themeColors, companyProfile, setLogoUrl, setThemeColors, setCompanyProfile,
-    addUser, updateUser,
+    addUser, updateUser, resetUserPassword,
     addCustomer, updateCustomer,
     addSupplier, updateSupplier,
     addProduct, updateProduct,

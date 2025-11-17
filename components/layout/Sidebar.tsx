@@ -16,10 +16,14 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
   const { hasPermission } = useAuth();
   const { logoUrl } = useAppContext();
 
-  const NavGroup: React.FC<{title: string, links: typeof NAV_LINKS}> = ({ title, links }) => (
+  const NavGroup: React.FC<{title: string, links: typeof NAV_LINKS}> = ({ title, links }) => {
+    const visibleLinks = links.filter(link => hasPermission(link.permission));
+    if (visibleLinks.length === 0) return null;
+
+    return (
      <>
       <p className="mt-8 px-4 text-xs text-gray-500 uppercase font-semibold">{title}</p>
-      {links.map(link => (
+      {visibleLinks.map(link => (
           <NavLink
             key={link.name}
             to={link.path}
@@ -37,7 +41,8 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
           </NavLink>
         ))}
      </>
-  );
+    )
+  };
 
 
   return (

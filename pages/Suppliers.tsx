@@ -1,10 +1,9 @@
+
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Supplier, Permission } from '../types';
-// FIX: Added icons for status display
 import { Plus, Search, Edit, Trash2, FileWarning, CheckCircle, FileDown } from 'lucide-react';
 import Modal from '../components/ui/Modal';
-// FIX: Imported useAuth to get the current user for actions.
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
 
@@ -54,7 +53,6 @@ const SupplierForm: React.FC<{ supplier?: Supplier; onSave: (supplier: Omit<Supp
 };
 
 const Suppliers: React.FC = () => {
-    // FIX: Replaced deleteSupplier with requestDelete to use approval workflow.
     const { suppliers, addSupplier, updateSupplier, requestDelete } = useAppContext();
     const { currentUser, hasPermission } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -64,10 +62,8 @@ const Suppliers: React.FC = () => {
     const handleSave = (supplier: Omit<Supplier, 'id'> | Supplier) => {
         if (!currentUser) return;
         if ('id' in supplier) {
-            // FIX: Pass currentUser.id as the second argument.
             updateSupplier(supplier, currentUser.id);
         } else {
-            // FIX: Pass currentUser.id as the second argument.
             addSupplier(supplier, currentUser.id);
         }
         setIsModalOpen(false);
@@ -98,10 +94,12 @@ const Suppliers: React.FC = () => {
         <div>
             <div className="flex justify-between items-center mb-6 no-print">
                 <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Suppliers</h1>
-                <button onClick={() => { setEditingSupplier(undefined); setIsModalOpen(true); }} className="bg-primary text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-indigo-700">
-                    <Plus size={20} />
-                    <span>Add Supplier</span>
-                </button>
+                {hasPermission(Permission.CREATE_PURCHASE) && (
+                    <button onClick={() => { setEditingSupplier(undefined); setIsModalOpen(true); }} className="bg-primary text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-indigo-700">
+                        <Plus size={20} />
+                        <span>Add Supplier</span>
+                    </button>
+                )}
             </div>
             
             <div className="bg-white dark:bg-dark-secondary p-6 rounded-lg shadow-md printable-content">
@@ -146,8 +144,8 @@ const Suppliers: React.FC = () => {
                                     <td className="p-4">
                                         {supplier.status === 'pending_deletion' ? <span className="flex items-center text-yellow-500"><FileWarning size={16} className="mr-1"/>Pending Deletion</span> : <span className="flex items-center text-green-500"><CheckCircle size={16} className="mr-1"/>Active</span>}
                                     </td>
-                                    <td className="p-4 text-right no-print">
-                                        <button onClick={() => handleEdit(supplier)} className="text-blue-500 hover:text-blue-700 mr-2"><Edit size={18} /></button>
+                                    <td className="p-4 text-right no-print space-x-2">
+                                        {hasPermission(Permission.EDIT_PURCHASE) && <button onClick={() => handleEdit(supplier)} className="text-blue-500 hover:text-blue-700"><Edit size={18} /></button>}
                                         {hasPermission(Permission.REQUEST_DELETE_PURCHASE) && supplier.status !== 'pending_deletion' && (
                                             <button onClick={() => handleDeleteRequest(supplier.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18} /></button>
                                         )}

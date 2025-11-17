@@ -1,19 +1,21 @@
 
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import { useAuth } from '../../context/auth';
 import { User, UserRole, Permission } from '../../types';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, KeyRound } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
+import ResetPasswordModal from '../../components/admin/ResetPasswordModal';
 
-const UserForm: React.FC<{ user?: User; onSave: (user: Omit<User, 'id'> | User) => void; onCancel: () => void; }> = ({ user, onSave, onCancel }) => {
+const EditUserForm: React.FC<{ user: User; onSave: (user: Omit<User, 'passwordHash'>) => void; onCancel: () => void; }> = ({ user, onSave, onCancel }) => {
     const { departments } = useAppContext();
     const [formData, setFormData] = useState({
-        name: user?.name || '',
-        email: user?.email || '',
-        role: user?.role || UserRole.SALES_STAFF,
-        departmentId: user?.departmentId || '',
-        isActive: user?.isActive !== undefined ? user.isActive : true,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        departmentId: user.departmentId,
+        isActive: user.isActive,
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -39,7 +41,7 @@ const UserForm: React.FC<{ user?: User; onSave: (user: Omit<User, 'id'> | User) 
                 </div>
                  <div>
                     <label className="block text-sm font-medium mb-1">Email</label>
-                    <input type="email" name="email" value={formData.email} onChange={handleChange} required className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                    <input type="email" name="email" value={formData.email} disabled className="w-full p-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600 cursor-not-allowed" />
                 </div>
                 <div>
                     <label className="block text-sm font-medium mb-1">Role</label>
@@ -61,33 +63,41 @@ const UserForm: React.FC<{ user?: User; onSave: (user: Omit<User, 'id'> | User) 
             </div>
             <div className="mt-6 flex justify-end space-x-4">
                 <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-200 dark:bg-gray-600 rounded-lg">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-primary text-white rounded-lg">Save User</button>
+                <button type="submit" className="px-4 py-2 bg-primary text-white rounded-lg">Save Changes</button>
             </div>
         </form>
     );
 };
 
 const Users: React.FC = () => {
-    const { users, addUser, updateUser, departments } = useAppContext();
+    const { users, updateUser, departments } = useAppContext();
     const { hasPermission } = useAuth();
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingUser, setEditingUser] = useState<User | undefined>(undefined);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+    const [selectedUser, setSelectedUser] = useState<User | undefined>(undefined);
     
     const getDepartmentName = (id: string) => departments.find(d => d.id === id)?.name || 'N/A';
     
-    const handleSave = (user: Omit<User, 'id'> | User) => {
-        if ('id' in user) {
-            updateUser(user);
-        } else {
-            addUser(user);
-        }
-        setIsModalOpen(false);
-        setEditingUser(undefined);
+    const handleUpdate = (user: Omit<User, 'passwordHash'>) => {
+        updateUser(user);
+        setIsEditModalOpen(false);
+        setSelectedUser(undefined);
     };
 
-    const handleEdit = (user: User) => {
-        setEditingUser(user);
-        setIsModalOpen(true);
+    const handleEditClick = (user: User) => {
+        setSelectedUser(user);
+        setIsEditModalOpen(true);
+    };
+    
+    const handleResetPasswordClick = (user: User) => {
+        setSelectedUser(user);
+        setIsResetPasswordModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsEditModalOpen(false);
+        setIsResetPasswordModalOpen(false);
+        setSelectedUser(undefined);
     };
 
     return (
@@ -95,10 +105,10 @@ const Users: React.FC = () => {
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-800 dark:text-white">User Management</h1>
                 {hasPermission(Permission.MANAGE_USERS) && (
-                    <button onClick={() => { setEditingUser(undefined); setIsModalOpen(true); }} className="bg-primary text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-indigo-700">
+                    <Link to="/admin/users/add" className="bg-primary text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-indigo-700">
                         <Plus size={20} />
                         <span>Add User</span>
-                    </button>
+                    </Link>
                 )}
             </div>
             <div className="bg-white dark:bg-dark-secondary p-6 rounded-lg shadow-md">
@@ -122,13 +132,20 @@ const Users: React.FC = () => {
                                     <td className="p-4">{user.role}</td>
                                     <td className="p-4">{getDepartmentName(user.departmentId)}</td>
                                     <td className="p-4">
-                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${user.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
                                             {user.isActive ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>
-                                    <td className="p-4 text-right">
+                                    <td className="p-4 text-right space-x-4">
                                         {hasPermission(Permission.MANAGE_USERS) && (
-                                            <button onClick={() => handleEdit(user)} className="text-blue-500 hover:text-blue-700"><Edit size={18} /></button>
+                                            <>
+                                                <button onClick={() => handleEditClick(user)} className="text-blue-500 hover:text-blue-700" title="Edit User">
+                                                  <Edit size={18} />
+                                                </button>
+                                                <button onClick={() => handleResetPasswordClick(user)} className="text-yellow-500 hover:text-yellow-700" title="Reset Password">
+                                                  <KeyRound size={18} />
+                                                </button>
+                                            </>
                                         )}
                                     </td>
                                 </tr>
@@ -137,13 +154,22 @@ const Users: React.FC = () => {
                     </table>
                 </div>
             </div>
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingUser ? "Edit User" : "Add New User"}>
-                <UserForm 
-                    user={editingUser}
-                    onSave={handleSave}
-                    onCancel={() => { setIsModalOpen(false); setEditingUser(undefined); }}
-                />
-            </Modal>
+            {selectedUser && (
+                <>
+                    <Modal isOpen={isEditModalOpen} onClose={closeModal} title={`Edit User: ${selectedUser.name}`}>
+                        <EditUserForm 
+                            user={selectedUser}
+                            onSave={handleUpdate}
+                            onCancel={closeModal}
+                        />
+                    </Modal>
+                    <ResetPasswordModal
+                        isOpen={isResetPasswordModalOpen}
+                        onClose={closeModal}
+                        user={selectedUser}
+                    />
+                </>
+            )}
         </div>
     );
 };

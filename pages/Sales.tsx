@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
@@ -21,6 +22,13 @@ const Sales: React.FC = () => {
     const [customerId, setCustomerId] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [items, setItems] = useState<Array<{productId: string, quantity: number, price: number}>>([{ productId: '', quantity: 1, price: 0 }]);
+
+    const displayedSales = useMemo(() => {
+        if (currentUser?.role === UserRole.SALES_STAFF) {
+            return sales.filter(s => s.createdBy === currentUser.id);
+        }
+        return sales;
+    }, [sales, currentUser]);
 
     const handleAddItem = () => setItems([...items, { productId: '', quantity: 1, price: 0 }]);
     const handleRemoveItem = (index: number) => setItems(items.filter((_, i) => i !== index));
@@ -56,7 +64,7 @@ const Sales: React.FC = () => {
     };
 
     const handleExport = () => {
-        const dataToExport = sales.map(s => ({
+        const dataToExport = displayedSales.map(s => ({
             invoiceNumber: s.invoiceNumber,
             customerName: getCustomerName(s.customerId),
             date: s.date,
@@ -103,7 +111,6 @@ const Sales: React.FC = () => {
                 { accountId: '501', debit: totalCogs, credit: 0 },
                 ...cogsAndInventoryLines,
             ],
-            // FIX: Added createdBy to satisfy the type requirement for postJournalEntry.
             createdBy: currentUser.id,
         };
 
@@ -153,7 +160,7 @@ const Sales: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {sales.map(sale => (
+                            {displayedSales.map(sale => (
                                 <tr key={sale.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
                                     <td className="p-4 font-mono">{sale.invoiceNumber}</td>
                                     <td className="p-4">{getCustomerName(sale.customerId)}</td>

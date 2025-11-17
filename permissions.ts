@@ -92,5 +92,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.CREATE_EXPENSE,
     Permission.VIEW_EXPENSE,
   ],
-  [UserRole.CUSTOM]: [], // Custom role starts with no permissions
+  [UserRole.CUSTOM]: [
+    Permission.VIEW_DASHBOARD,
+    Permission.VIEW_CUSTOMER,
+    Permission.VIEW_SALE,
+  ], 
 };

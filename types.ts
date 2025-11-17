@@ -89,10 +89,11 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  password?: string; // Should be handled securely on a backend
+  passwordHash: string; // Changed from password. In a real app, this would be a bcrypt hash.
   role: UserRole;
   departmentId: string;
   isActive: boolean;
+  createdAt: string;
 }
 
 export interface RoleDefinition {

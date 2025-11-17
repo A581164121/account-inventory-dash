@@ -1,10 +1,9 @@
+
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Customer, Permission } from '../types';
-// FIX: Added icons for status display
 import { Plus, Search, Edit, Trash2, FileWarning, CheckCircle, FileDown } from 'lucide-react';
 import Modal from '../components/ui/Modal';
-// FIX: Imported useAuth to get the current user for actions.
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
 
@@ -55,7 +54,6 @@ const CustomerForm: React.FC<{ customer?: Customer; onSave: (customer: Omit<Cust
 
 
 const Customers: React.FC = () => {
-    // FIX: Replaced deleteCustomer with requestDelete to use approval workflow.
     const { customers, addCustomer, updateCustomer, requestDelete } = useAppContext();
     const { currentUser, hasPermission } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -65,10 +63,8 @@ const Customers: React.FC = () => {
     const handleSave = (customer: Omit<Customer, 'id'> | Customer) => {
         if (!currentUser) return;
         if ('id' in customer) {
-            // FIX: Pass currentUser.id as the second argument.
             updateCustomer(customer, currentUser.id);
         } else {
-            // FIX: Pass currentUser.id as the second argument.
             addCustomer(customer, currentUser.id);
         }
         setIsModalOpen(false);
@@ -99,10 +95,12 @@ const Customers: React.FC = () => {
         <div>
             <div className="flex justify-between items-center mb-6 no-print">
                 <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Customers</h1>
-                <button onClick={() => { setEditingCustomer(undefined); setIsModalOpen(true); }} className="bg-primary text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-indigo-700">
-                    <Plus size={20} />
-                    <span>Add Customer</span>
-                </button>
+                {hasPermission(Permission.CREATE_CUSTOMER) && (
+                    <button onClick={() => { setEditingCustomer(undefined); setIsModalOpen(true); }} className="bg-primary text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-indigo-700">
+                        <Plus size={20} />
+                        <span>Add Customer</span>
+                    </button>
+                )}
             </div>
             
             <div className="bg-white dark:bg-dark-secondary p-6 rounded-lg shadow-md printable-content">
@@ -147,8 +145,8 @@ const Customers: React.FC = () => {
                                     <td className="p-4">
                                         {customer.status === 'pending_deletion' ? <span className="flex items-center text-yellow-500"><FileWarning size={16} className="mr-1"/>Pending Deletion</span> : <span className="flex items-center text-green-500"><CheckCircle size={16} className="mr-1"/>Active</span>}
                                     </td>
-                                    <td className="p-4 text-right no-print">
-                                        <button onClick={() => handleEdit(customer)} className="text-blue-500 hover:text-blue-700 mr-2"><Edit size={18} /></button>
+                                    <td className="p-4 text-right no-print space-x-2">
+                                        {hasPermission(Permission.EDIT_CUSTOMER) && <button onClick={() => handleEdit(customer)} className="text-blue-500 hover:text-blue-700"><Edit size={18} /></button>}
                                         {hasPermission(Permission.REQUEST_DELETE_CUSTOMER) && customer.status !== 'pending_deletion' && (
                                           <button onClick={() => handleDeleteRequest(customer.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18} /></button>
                                         )}

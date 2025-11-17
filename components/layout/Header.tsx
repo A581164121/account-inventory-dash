@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Menu } from 'lucide-react';
+import { Menu, LogOut } from 'lucide-react';
 import Logo from './Logo';
 import { useAuth } from '../../context/auth';
 import { useAppContext } from '../../context/AppContext';
@@ -10,7 +10,7 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ setSidebarOpen }) => {
-  const { currentUser, users, login } = useAuth();
+  const { currentUser, logout } = useAuth();
   const { logoUrl } = useAppContext();
 
   return (
@@ -33,16 +33,14 @@ const Header: React.FC<HeaderProps> = ({ setSidebarOpen }) => {
               <span className="font-semibold hidden md:block">{currentUser?.name || 'Not Logged In'}</span>
               <span className="text-xs text-gray-500 dark:text-gray-400 hidden md:block">{currentUser?.role}</span>
             </div>
-            <select 
-              value={currentUser?.id || ''} 
-              onChange={(e) => login(e.target.value)}
-              className="bg-transparent font-semibold cursor-pointer appearance-none p-1 rounded-md text-sm"
-              aria-label="Switch User"
+            <button 
+              onClick={logout}
+              className="p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+              aria-label="Logout"
+              title="Logout"
             >
-              {users.map(user => (
-                <option key={user.id} value={user.id}>{user.name}</option>
-              ))}
-            </select>
+              <LogOut size={20} />
+            </button>
           </div>
         </div>
       </div>

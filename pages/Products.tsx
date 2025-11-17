@@ -1,10 +1,9 @@
+
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Product, Permission } from '../types';
-// FIX: Added icons for status display
 import { Plus, Search, Edit, Trash2, FileWarning, CheckCircle, FileDown } from 'lucide-react';
 import Modal from '../components/ui/Modal';
-// FIX: Imported useAuth to get the current user for actions.
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
 
@@ -75,7 +74,6 @@ const ProductForm: React.FC<{ product?: Product; onSave: (product: Omit<Product,
 }
 
 const Products: React.FC = () => {
-    // FIX: Replaced deleteProduct with requestDelete to use approval workflow.
     const { products, addProduct, updateProduct, requestDelete } = useAppContext();
     const { currentUser, hasPermission } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -87,10 +85,8 @@ const Products: React.FC = () => {
     const handleSave = (product: Omit<Product, 'id'> | Product) => {
         if (!currentUser) return;
         if ('id' in product) {
-            // FIX: Pass currentUser.id as the second argument.
             updateProduct(product, currentUser.id);
         } else {
-            // FIX: Pass currentUser.id as the second argument.
             addProduct(product, currentUser.id);
         }
         setIsModalOpen(false);
@@ -122,10 +118,12 @@ const Products: React.FC = () => {
         <div>
             <div className="flex justify-between items-center mb-6 no-print">
                 <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Products / Inventory</h1>
-                <button onClick={() => { setEditingProduct(undefined); setIsModalOpen(true); }} className="bg-primary text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-indigo-700">
-                    <Plus size={20} />
-                    <span>Add Product</span>
-                </button>
+                {hasPermission(Permission.CREATE_SALE) && ( // Assuming sales/purchase staff can add products
+                    <button onClick={() => { setEditingProduct(undefined); setIsModalOpen(true); }} className="bg-primary text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-indigo-700">
+                        <Plus size={20} />
+                        <span>Add Product</span>
+                    </button>
+                )}
             </div>
             
             <div className="bg-white dark:bg-dark-secondary p-6 rounded-lg shadow-md printable-content">
@@ -174,9 +172,9 @@ const Products: React.FC = () => {
                                     <td className="p-4">
                                         {product.status === 'pending_deletion' ? <span className="flex items-center text-yellow-500"><FileWarning size={16} className="mr-1"/>Pending Deletion</span> : <span className="flex items-center text-green-500"><CheckCircle size={16} className="mr-1"/>Active</span>}
                                     </td>
-                                    <td className="p-4 text-right no-print">
-                                        <button onClick={() => handleEdit(product)} className="text-blue-500 hover:text-blue-700 mr-2"><Edit size={18} /></button>
-                                        {product.status !== 'pending_deletion' && (
+                                    <td className="p-4 text-right no-print space-x-2">
+                                        {hasPermission(Permission.EDIT_SALE) && <button onClick={() => handleEdit(product)} className="text-blue-500 hover:text-blue-700"><Edit size={18} /></button>}
+                                        {hasPermission(Permission.REQUEST_DELETE_SALE) && product.status !== 'pending_deletion' && (
                                             <button onClick={() => handleDeleteRequest(product.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18} /></button>
                                         )}
                                     </td>
