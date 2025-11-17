@@ -1,5 +1,10 @@
-
 import { UserRole } from "../types";
+
+// IMPORTANT: This is a frontend simulation of password hashing.
+// In a real application, you would use a library like bcrypt on the server.
+const FAKE_SALT = 'a_very_salty_salt_string';
+export const fakeHash = (password: string): string => `bcrypt_sim_${password}_${FAKE_SALT}`;
+export const fakeCompare = (password: string, hash: string): boolean => hash === fakeHash(password);
 
 export const getRedirectPathForRole = (role: UserRole): string => {
     switch (role) {

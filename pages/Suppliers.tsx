@@ -1,11 +1,11 @@
-
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Supplier, Permission } from '../types';
-import { Plus, Search, Edit, Trash2, FileWarning, CheckCircle, FileDown } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, FileWarning, CheckCircle, FileDown, History } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
+import RecordHistoryModal from '../components/ui/RecordHistoryModal';
 
 const SupplierForm: React.FC<{ supplier?: Supplier; onSave: (supplier: Omit<Supplier, 'id'> | Supplier) => void; onCancel: () => void; }> = ({ supplier, onSave, onCancel }) => {
     const [formData, setFormData] = useState({
@@ -56,15 +56,16 @@ const Suppliers: React.FC = () => {
     const { suppliers, addSupplier, updateSupplier, requestDelete } = useAppContext();
     const { currentUser, hasPermission } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState<Supplier | undefined>(undefined);
     const [searchQuery, setSearchQuery] = useState('');
 
     const handleSave = (supplier: Omit<Supplier, 'id'> | Supplier) => {
         if (!currentUser) return;
         if ('id' in supplier) {
-            updateSupplier(supplier, currentUser.id);
+            updateSupplier(supplier);
         } else {
-            addSupplier(supplier, currentUser.id);
+            addSupplier(supplier as Omit<Supplier, 'id' | 'status' | 'isDeleted' | 'createdAt' | 'createdBy' | 'editHistory'>);
         }
         setIsModalOpen(false);
         setEditingSupplier(undefined);
@@ -75,19 +76,25 @@ const Suppliers: React.FC = () => {
         setIsModalOpen(true);
     };
 
+     const handleViewHistory = (supplier: Supplier) => {
+        setEditingSupplier(supplier);
+        setIsHistoryModalOpen(true);
+    };
+
     const handleDeleteRequest = (id: string) => {
         if (currentUser && window.confirm('Are you sure you want to request deletion for this supplier? An administrator will need to approve it.')) {
-            requestDelete('supplier', id, currentUser.id);
+            requestDelete('supplier', id);
         }
     };
     
     const filteredSuppliers = suppliers.filter(s => 
-        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.email.toLowerCase().includes(searchQuery.toLowerCase())
+        !s.isDeleted &&
+        (s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.email.toLowerCase().includes(searchQuery.toLowerCase()))
     );
     
     const handleExport = () => {
-        exportToCsv(filteredSuppliers, `suppliers_${new Date().toISOString().split('T')[0]}`);
+        exportToCsv(filteredSuppliers.map(s => ({id: s.id, name: s.name, email: s.email, phone: s.phone, address: s.address, status: s.status})), `suppliers_${new Date().toISOString().split('T')[0]}`);
     };
 
     return (
@@ -145,9 +152,10 @@ const Suppliers: React.FC = () => {
                                         {supplier.status === 'pending_deletion' ? <span className="flex items-center text-yellow-500"><FileWarning size={16} className="mr-1"/>Pending Deletion</span> : <span className="flex items-center text-green-500"><CheckCircle size={16} className="mr-1"/>Active</span>}
                                     </td>
                                     <td className="p-4 text-right no-print space-x-2">
-                                        {hasPermission(Permission.EDIT_PURCHASE) && <button onClick={() => handleEdit(supplier)} className="text-blue-500 hover:text-blue-700"><Edit size={18} /></button>}
+                                        {hasPermission(Permission.VIEW_AUDIT_TRAIL) && <button onClick={() => handleViewHistory(supplier)} className="text-gray-500 hover:text-gray-700" title="View History"><History size={18} /></button>}
+                                        {hasPermission(Permission.EDIT_PURCHASE) && <button onClick={() => handleEdit(supplier)} className="text-blue-500 hover:text-blue-700" title="Edit"><Edit size={18} /></button>}
                                         {hasPermission(Permission.REQUEST_DELETE_PURCHASE) && supplier.status !== 'pending_deletion' && (
-                                            <button onClick={() => handleDeleteRequest(supplier.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18} /></button>
+                                            <button onClick={() => handleDeleteRequest(supplier.id)} className="text-red-500 hover:text-red-700" title="Request Deletion"><Trash2 size={18} /></button>
                                         )}
                                     </td>
                                 </tr>
@@ -163,6 +171,15 @@ const Suppliers: React.FC = () => {
                     onCancel={() => { setIsModalOpen(false); setEditingSupplier(undefined); }}
                 />
             </Modal>
+
+            {editingSupplier && (
+              <RecordHistoryModal
+                isOpen={isHistoryModalOpen}
+                onClose={() => setIsHistoryModalOpen(false)}
+                recordName={editingSupplier.name}
+                history={editingSupplier.editHistory}
+              />
+            )}
         </div>
     );
 };

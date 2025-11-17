@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
@@ -91,6 +90,14 @@ const PurchaseInvoice: React.FC = () => {
 
                     <section className="flex justify-end mt-6">
                         <div className="w-full sm:w-1/2">
+                            <div className="flex justify-between py-2">
+                                <span className="font-semibold">Subtotal:</span>
+                                <span>{formatCurrency(purchase.subtotal)}</span>
+                            </div>
+                             <div className="flex justify-between py-2">
+                                <span className="font-semibold">Tax ({purchase.taxRate}%):</span>
+                                <span>{formatCurrency(purchase.taxAmount)}</span>
+                            </div>
                              <div className="flex justify-between py-3 mt-2 border-t-2 dark:border-gray-600 text-xl font-bold text-primary">
                                 <span>Total:</span>
                                 <span>{formatCurrency(purchase.total)}</span>

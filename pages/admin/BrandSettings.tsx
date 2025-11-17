@@ -85,7 +85,8 @@ const BrandSettings: React.FC = () => {
     };
     
     const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setProfileData({ ...profileData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setProfileData({ ...profileData, [name]: name === 'salesTaxRate' ? Number(value) : value });
     };
 
     const handleProfileSave = (e: React.FormEvent) => {
@@ -133,6 +134,11 @@ const BrandSettings: React.FC = () => {
                         <div className="md:col-span-2">
                             <label className="block text-sm font-medium mb-1">Address</label>
                             <textarea name="address" value={profileData.address} onChange={handleProfileChange} required disabled={!canManage} rows={3} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 disabled:opacity-70"></textarea>
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium mb-1">Sales Tax Rate (%)</label>
+                            <input type="number" name="salesTaxRate" value={profileData.salesTaxRate} onChange={handleProfileChange} required disabled={!canManage} min="0" step="0.01" className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 disabled:opacity-70" />
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">This rate will be used as the default for all new sales and purchases.</p>
                         </div>
                     </div>
                     {canManage && (

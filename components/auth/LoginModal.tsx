@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/auth';
 import Logo from '../layout/Logo';
 import { UserRole } from '../../types';
 import { getRedirectPathForRole } from '../../utils/auth';
+import { useAppContext } from '../../context/AppContext';
 
 const LoginModal: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -12,6 +12,7 @@ const LoginModal: React.FC = () => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const { login } = useAuth();
+    const { users } = useAppContext();
     const navigate = useNavigate();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -20,7 +21,7 @@ const LoginModal: React.FC = () => {
         setIsLoading(true);
 
         try {
-            const user = await login(email, password);
+            const user = await login(email, password, users);
             if (user) {
                 if (user.role === UserRole.CUSTOM) {
                     alert('Custom Role — Please fetch the allowed modules and permissions assigned to this user.');

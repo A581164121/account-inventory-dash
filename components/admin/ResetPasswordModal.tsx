@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { User } from '../../types';
 import { useAppContext } from '../../context/AppContext';
@@ -18,7 +17,7 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, onClose
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
@@ -32,7 +31,7 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, onClose
     setIsLoading(true);
     setError('');
     try {
-        resetUserPassword(user.id, password);
+        await resetUserPassword(user.id, password);
         alert('Password has been reset successfully.');
         onClose();
     } catch (err: any) {

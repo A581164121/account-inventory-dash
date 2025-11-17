@@ -1,25 +1,42 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Search, Eye, Trash2, FileWarning, CheckCircle, FileDown } from 'lucide-react';
 import Modal from '../components/ui/Modal';
-import { JournalEntry, JournalEntryLine, Purchase, Permission } from '../types';
+import { Purchase, Permission, PaymentMethod } from '../types';
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
+import { getNextPurchaseInvoiceNumber, commitInvoiceNumber } from '../services/invoiceNumberService';
 
 const Purchases: React.FC = () => {
-    const { purchases, setPurchases, suppliers, products, postJournalEntry, requestDelete } = useAppContext();
+    const { purchases, addPurchase, suppliers, products, requestDelete, companyProfile } = useAppContext();
     const { currentUser, hasPermission } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
-
+    
+    const salesTaxRate = companyProfile.salesTaxRate || 0;
     const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
     
     const getSupplierName = (id: string) => suppliers.find(s => s.id === id)?.name || 'N/A';
 
-    const [invoiceNumber, setInvoiceNumber] = useState(`PINV-${Date.now()}`);
+    const [invoiceNumber, setInvoiceNumber] = useState('');
     const [supplierId, setSupplierId] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Credit');
     const [items, setItems] = useState<Array<{productId: string, quantity: number, price: number}>>([{ productId: '', quantity: 1, price: 0 }]);
+
+    const activePurchases = useMemo(() => purchases.filter(p => !p.isDeleted), [purchases]);
+
+    useEffect(() => {
+        if (isModalOpen && supplierId) {
+            const supplier = suppliers.find(s => s.id === supplierId);
+            if (supplier) {
+                const newInvoiceNumber = getNextPurchaseInvoiceNumber(supplierId, supplier.name);
+                setInvoiceNumber(newInvoiceNumber);
+            }
+        } else if (!supplierId) {
+            setInvoiceNumber('');
+        }
+    }, [supplierId, suppliers, purchases, isModalOpen]);
 
     const handleAddItem = () => setItems([...items, { productId: '', quantity: 1, price: 0 }]);
     const handleRemoveItem = (index: number) => setItems(items.filter((_, i) => i !== index));
@@ -39,69 +56,63 @@ const Purchases: React.FC = () => {
         setItems(newItems);
     };
 
-    const total = useMemo(() => items.reduce((sum, item) => sum + (item.quantity * item.price), 0), [items]);
+    const subtotal = useMemo(() => items.reduce((sum, item) => sum + (item.quantity * item.price), 0), [items]);
+    const taxAmount = useMemo(() => subtotal * (salesTaxRate / 100), [subtotal, salesTaxRate]);
+    const total = useMemo(() => subtotal + taxAmount, [subtotal, taxAmount]);
 
     const resetForm = () => {
-        setInvoiceNumber(`PINV-${Date.now()}`);
+        setInvoiceNumber('');
         setSupplierId('');
         setDate(new Date().toISOString().split('T')[0]);
+        setPaymentMethod('Credit');
         setItems([{ productId: '', quantity: 1, price: 0 }]);
     }
 
     const handleDeleteRequest = (purchaseId: string) => {
         if (currentUser && window.confirm('Are you sure you want to request deletion for this purchase? An administrator will need to approve it.')) {
-            requestDelete('purchase', purchaseId, currentUser.id);
+            requestDelete('purchase', purchaseId);
         }
     };
 
     const handleExport = () => {
-        const dataToExport = purchases.map(p => ({
+        const dataToExport = activePurchases.map(p => ({
             invoiceNumber: p.invoiceNumber,
             supplierName: getSupplierName(p.supplierId),
             date: p.date,
+            paymentMethod: p.paymentMethod,
+            subtotal: p.subtotal,
+            taxAmount: p.taxAmount,
             total: p.total,
-            status: p.status,
-            createdBy: p.createdBy,
+            status: p.status
         }));
         exportToCsv(dataToExport, `purchases_${new Date().toISOString().split('T')[0]}`);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!currentUser || !supplierId || !invoiceNumber || items.some(item => !item.productId || item.quantity <= 0)) {
             alert('Please fill all required fields and ensure quantity is greater than 0.');
             return;
         }
-
-        const purchaseId = `PUR-${Date.now()}`;
-        const supplierName = suppliers.find(s => s.id === supplierId)?.name || 'N/A';
-        const journalEntryLines: JournalEntryLine[] = [];
-        
-        items.forEach(item => {
-            journalEntryLines.push({ accountId: '103', debit: item.quantity * item.price, credit: 0, productId: item.productId, quantity: item.quantity });
-        });
-        journalEntryLines.push({ accountId: '201', debit: 0, credit: total, supplierId: supplierId });
-
-        const newJournalEntry: Omit<JournalEntry, 'id' | 'status'> = {
-            date,
-            description: `Purchase from ${supplierName} - Inv #${invoiceNumber}`,
-            lines: journalEntryLines,
-            // FIX: Added createdBy to satisfy the type requirement for postJournalEntry.
-            createdBy: currentUser.id,
-        };
-
-        const createdJournalEntry = postJournalEntry(newJournalEntry, currentUser.id);
-
-        const newPurchase: Purchase = {
-            id: purchaseId, invoiceNumber, supplierId, date, items, total,
-            journalEntryId: createdJournalEntry.id,
-            status: 'approved', // Auto-approved
-            createdBy: currentUser.id,
-        };
-        setPurchases(prev => [newPurchase, ...prev]);
-        
-        setIsModalOpen(false);
-        resetForm();
+        try {
+            const newPurchaseData: Omit<Purchase, 'id'| 'isDeleted' | 'createdAt' | 'createdBy' | 'editHistory'> = {
+                invoiceNumber, supplierId, date, items,
+                subtotal,
+                taxRate: salesTaxRate,
+                taxAmount,
+                total,
+                status: 'approved',
+                paymentMethod,
+                departmentId: currentUser.departmentId,
+            };
+            await addPurchase(newPurchaseData);
+            commitInvoiceNumber('purchase', supplierId, invoiceNumber);
+            
+            setIsModalOpen(false);
+            resetForm();
+        } catch (error) {
+            console.error("Purchase submission failed:", error);
+        }
     };
 
     return (
@@ -136,7 +147,7 @@ const Purchases: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {purchases.map(purchase => (
+                            {activePurchases.map(purchase => (
                                 <tr key={purchase.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
                                     <td className="p-4 font-mono">{purchase.invoiceNumber}</td>
                                     <td className="p-4">{getSupplierName(purchase.supplierId)}</td>
@@ -164,12 +175,8 @@ const Purchases: React.FC = () => {
             
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Purchase">
                 <form onSubmit={handleSubmit}>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Invoice #</label>
-                             <input type="text" value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} required className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
-                        </div>
-                        <div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="lg:col-span-2">
                             <label className="block text-sm font-medium mb-1">Supplier</label>
                             <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} required className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
                                 <option value="">Select Supplier</option>
@@ -177,8 +184,19 @@ const Purchases: React.FC = () => {
                             </select>
                         </div>
                         <div>
+                            <label className="block text-sm font-medium mb-1">Invoice #</label>
+                             <input type="text" value={invoiceNumber} readOnly required className="w-full p-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600 bg-gray-100 cursor-not-allowed" />
+                        </div>
+                        <div>
                              <label className="block text-sm font-medium mb-1">Date</label>
                              <input type="date" value={date} onChange={e => setDate(e.target.value)} required className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                        </div>
+                         <div className="lg:col-span-2">
+                            <label className="block text-sm font-medium mb-1">Payment Method</label>
+                             <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)} required className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                                <option value="Credit">Credit</option>
+                                <option value="Cash">Cash</option>
+                            </select>
                         </div>
                     </div>
 
@@ -209,8 +227,21 @@ const Purchases: React.FC = () => {
                          <button type="button" onClick={handleAddItem} className="mt-2 text-sm text-primary hover:underline flex items-center space-x-1"><Plus size={16} /><span>Add Item</span></button>
                     </div>
 
-                    <div className="mt-6 border-t dark:border-gray-700 pt-4 flex justify-end items-center">
-                        <div className="text-xl font-bold">Total: {formatCurrency(total)}</div>
+                    <div className="mt-6 border-t dark:border-gray-700 pt-4 flex justify-end">
+                        <div className="w-full sm:w-1/2">
+                            <div className="flex justify-between py-1 text-gray-600 dark:text-gray-300">
+                                <span>Subtotal:</span>
+                                <span>{formatCurrency(subtotal)}</span>
+                            </div>
+                            <div className="flex justify-between py-1 text-gray-600 dark:text-gray-300">
+                                <span>Tax ({salesTaxRate}%):</span>
+                                <span>{formatCurrency(taxAmount)}</span>
+                            </div>
+                            <div className="flex justify-between py-2 mt-1 font-bold text-xl border-t dark:border-gray-600">
+                                <span>Total:</span>
+                                <span>{formatCurrency(total)}</span>
+                            </div>
+                        </div>
                     </div>
                     
                     <div className="mt-6 flex justify-end space-x-4">

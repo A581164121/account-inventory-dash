@@ -1,24 +1,14 @@
-
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback, useRef } from 'react';
 import { User, Permission, UserRole } from '../types';
-import { MOCK_USERS } from '../data/mockData';
 import { ROLE_PERMISSIONS } from '../permissions';
-
-// IMPORTANT: This is a frontend simulation of password hashing.
-// In a real application, you would use a library like bcrypt on the server.
-const FAKE_SALT = 'a_very_salty_salt_string';
-const fakeHash = (password: string): string => `bcrypt_sim_${password}_${FAKE_SALT}`;
-const fakeCompare = (password: string, hash: string): boolean => hash === fakeHash(password);
+import { fakeCompare } from '../utils/auth';
 
 interface AuthContextType {
   currentUser: User | null;
-  users: User[];
-  login: (email: string, password: string) => Promise<User | null>;
+  login: (email: string, password: string, users: User[]) => Promise<User | null>;
   logout: () => void;
   hasPermission: (permission: Permission) => boolean;
-  addUser: (user: Omit<User, 'id' | 'passwordHash' | 'createdAt'>, password: string) => User;
-  updateUser: (user: Omit<User, 'passwordHash'>) => void;
-  resetUserPassword: (userId: string, newPassword: string) => void;
+  authInitialized: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,9 +16,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout>>();
+  
+  useEffect(() => {
+    setAuthInitialized(true);
+  }, []);
 
   const logout = useCallback(() => {
     setCurrentUser(null);
@@ -67,7 +61,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [currentUser, resetInactivityTimer]);
 
 
-  const login = async (email: string, password: string): Promise<User | null> => {
+  const login = async (email: string, password: string, users: User[]): Promise<User | null> => {
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
     if (user && fakeCompare(password, user.passwordHash)) {
@@ -89,35 +83,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return userPermissions.includes(permission);
   };
 
-  // User Management Functions
-  const addUser = (userData: Omit<User, 'id' | 'passwordHash' | 'createdAt'>, password: string): User => {
-    const newUser: User = {
-        ...userData,
-        id: `USER-${Date.now()}`,
-        passwordHash: fakeHash(password),
-        createdAt: new Date().toISOString(),
-    };
-    setUsers(prev => [...prev, newUser]);
-    return newUser;
-  };
-
-  const updateUser = (updatedUserData: Omit<User, 'passwordHash'>) => {
-    setUsers(prev => prev.map(u => u.id === updatedUserData.id ? { ...u, ...updatedUserData } : u));
-  };
-
-  const resetUserPassword = (userId: string, newPassword: string) => {
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, passwordHash: fakeHash(newPassword) } : u));
-  };
-
   const value = {
     currentUser,
-    users, // Expose full user objects within auth context
     login,
     logout,
     hasPermission,
-    addUser,
-    updateUser,
-    resetUserPassword
+    authInitialized,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

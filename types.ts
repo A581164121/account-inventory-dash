@@ -1,4 +1,3 @@
-
 export enum UserRole {
   SUPER_ADMIN = 'Super Admin',
   ADMIN = 'Admin',
@@ -14,16 +13,24 @@ export enum UserRole {
 }
 
 export interface ThemeColors {
+  id: 'themeColors';
   primary: string;
   secondary: string;
 }
 
 export interface CompanyProfile {
+  id: 'companyProfile';
   name: string;
   address: string;
   phone: string;
   email: string;
   website?: string;
+  salesTaxRate: number;
+}
+
+export interface LogoUrl {
+    id: 'logoUrl';
+    url: string | null;
 }
 
 export enum Permission {
@@ -78,6 +85,12 @@ export enum Permission {
   EDIT_EXPENSE = 'EDIT_EXPENSE',
   REQUEST_DELETE_EXPENSE = 'REQUEST_DELETE_EXPENSE',
   APPROVE_DELETE_EXPENSE = 'APPROVE_DELETE_EXPENSE',
+  
+  // Data Management
+  MANAGE_DATA_BACKUP = 'MANAGE_DATA_BACKUP',
+
+  // Audit Trail
+  VIEW_AUDIT_TRAIL = 'VIEW_AUDIT_TRAIL',
 }
 
 export interface Department {
@@ -126,7 +139,26 @@ export interface ActivityLog {
   details: string;
 }
 
-export interface Customer {
+export interface EditLog {
+  timestamp: string;
+  userId: string;
+  field: string;
+  oldValue: any;
+  newValue: any;
+}
+
+interface Auditable {
+    createdAt: string;
+    createdBy: string; // userId
+    updatedAt?: string;
+    updatedBy?: string; // userId
+    isDeleted: boolean;
+    deletedAt?: string;
+    deletedBy?: string; // userId
+    editHistory: EditLog[];
+}
+
+export interface Customer extends Auditable {
   id: string;
   name: string;
   email: string;
@@ -135,7 +167,7 @@ export interface Customer {
   status?: RecordStatus;
 }
 
-export interface Supplier {
+export interface Supplier extends Auditable {
   id: string;
   name: string;
   email: string;
@@ -144,7 +176,7 @@ export interface Supplier {
   status?: RecordStatus;
 }
 
-export interface Product {
+export interface Product extends Auditable {
   id: string;
   name: string;
   sku: string;
@@ -163,16 +195,22 @@ export interface SaleItem {
   price: number;
 }
 
-export interface Sale {
+export type PaymentMethod = 'Cash' | 'Credit';
+
+export interface Sale extends Auditable {
   id:string;
   invoiceNumber: string;
   customerId: string;
   date: string;
   items: SaleItem[];
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
   total: number;
   journalEntryId?: string;
   status: RecordStatus;
-  createdBy: string; // userId
+  paymentMethod: PaymentMethod;
+  departmentId: string;
 }
 
 export interface PurchaseItem {
@@ -181,19 +219,23 @@ export interface PurchaseItem {
   price: number;
 }
 
-export interface Purchase {
+export interface Purchase extends Auditable {
   id: string;
   invoiceNumber: string;
   supplierId: string;
   date: string;
   items: PurchaseItem[];
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
   total: number;
   journalEntryId?: string;
   status: RecordStatus;
-  createdBy: string; // userId
+  paymentMethod: PaymentMethod;
+  departmentId: string;
 }
 
-export interface Expense {
+export interface Expense extends Auditable {
   id: string;
   category: string;
   date: string;
@@ -201,7 +243,7 @@ export interface Expense {
   description: string;
   journalEntryId?: string;
   status: RecordStatus;
-  createdBy: string; // userId
+  departmentId: string;
 }
 
 export interface JournalEntryLine {
@@ -214,13 +256,12 @@ export interface JournalEntryLine {
   supplierId?: string;
 }
 
-export interface JournalEntry {
+export interface JournalEntry extends Auditable {
   id: string;
   date: string;
   description: string;
   lines: JournalEntryLine[];
   status: RecordStatus;
-  createdBy: string; // userId
 }
 
 export type AccountType = 'Asset' | 'Liability' | 'Equity' | 'Revenue' | 'Expense';

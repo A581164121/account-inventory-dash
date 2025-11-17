@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Expense, JournalEntry, Permission } from '../types';
-import { Plus, Edit, Trash2, FileWarning, CheckCircle, FileDown } from 'lucide-react';
+import { Expense, Permission } from '../types';
+import { Plus, Edit, Trash2, FileWarning, CheckCircle, FileDown, History } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
+import RecordHistoryModal from '../components/ui/RecordHistoryModal';
 
-const ExpenseForm: React.FC<{ expense?: Expense; onSave: (expense: Omit<Expense, 'id' | 'status' | 'createdBy'> | Expense) => void; onCancel: () => void; }> = ({ expense, onSave, onCancel }) => {
+const ExpenseForm: React.FC<{ expense?: Expense; onSave: (expense: Omit<Expense, 'id' | 'status' | 'createdBy' | 'departmentId' > | Expense) => void; onCancel: () => void; }> = ({ expense, onSave, onCancel }) => {
     const [formData, setFormData] = useState({
         date: expense?.date || new Date().toISOString().split('T')[0],
         category: expense?.category || '',
@@ -54,46 +55,23 @@ const ExpenseForm: React.FC<{ expense?: Expense; onSave: (expense: Omit<Expense,
 
 
 const Expenses: React.FC = () => {
-    const { expenses, setExpenses, updateExpense, requestDelete, accounts, postJournalEntry } = useAppContext();
+    const { expenses, addExpense, updateExpense, requestDelete } = useAppContext();
     const { currentUser, hasPermission } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingExpense, setEditingExpense] = useState<Expense | undefined>(undefined);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     
     const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    const activeExpenses = useMemo(() => expenses.filter(e => !e.isDeleted), [expenses]);
 
-    const handleSave = (expense: Omit<Expense, 'id' | 'status' | 'createdBy'> | Expense) => {
+    const handleSave = async (expense: Omit<Expense, 'id' | 'status' | 'createdBy' | 'departmentId'> | Expense) => {
         if (!currentUser) return;
-        if (!('id' in expense)) {
-            const newExpenseData = expense as Omit<Expense, 'id' | 'status' | 'createdBy'>;
-            const expenseAccount = accounts.find(a => a.name.toLowerCase().includes(newExpenseData.category.toLowerCase()) && a.type === 'Expense') 
-                                || accounts.find(a => a.id === '503');
-
-            if (!expenseAccount) {
-                alert(`Could not find an expense account for category: ${newExpenseData.category}. Please check account setup.`);
-                return;
-            }
-
-            const newJournalEntry: Omit<JournalEntry, 'id' | 'status'> = {
-                date: newExpenseData.date,
-                description: newExpenseData.description,
-                lines: [
-                    { accountId: expenseAccount.id, debit: newExpenseData.amount, credit: 0 },
-                    { accountId: '101', debit: 0, credit: newExpenseData.amount }
-                ],
-                // FIX: Added createdBy to satisfy the type requirement for postJournalEntry.
-                createdBy: currentUser.id,
-            };
-            const createdJournalEntry = postJournalEntry(newJournalEntry, currentUser.id);
-            const newExpenseWithId: Expense = {
-                id: `EXP-${Date.now()}`,
-                ...newExpenseData,
-                journalEntryId: createdJournalEntry.id,
-                status: 'approved',
-                createdBy: currentUser.id,
-            }
-            setExpenses(prev => [newExpenseWithId, ...prev]);
+        if ('id' in expense) {
+            await updateExpense(expense);
         } else {
-            updateExpense(expense, currentUser.id);
+            const newExpenseData = expense as Omit<Expense, 'id' | 'status' | 'createdBy' | 'isDeleted' | 'createdAt'|'createdBy' | 'editHistory' | 'departmentId'>;
+            
+            await addExpense({ ...newExpenseData, departmentId: currentUser.departmentId });
         }
 
         setIsModalOpen(false);
@@ -105,14 +83,19 @@ const Expenses: React.FC = () => {
         setIsModalOpen(true);
     };
 
+    const handleViewHistory = (expense: Expense) => {
+        setEditingExpense(expense);
+        setIsHistoryModalOpen(true);
+    };
+
     const handleDeleteRequest = (expenseId: string) => {
         if (currentUser && window.confirm('Are you sure you want to request deletion for this expense? An administrator will need to approve it.')) {
-            requestDelete('expense', expenseId, currentUser.id);
+            requestDelete('expense', expenseId);
         }
     };
 
     const handleExport = () => {
-        exportToCsv(expenses, `expenses_${new Date().toISOString().split('T')[0]}`);
+        exportToCsv(activeExpenses.map(e => ({id: e.id, date: e.date, category: e.category, description: e.description, amount: e.amount, status: e.status})), `expenses_${new Date().toISOString().split('T')[0]}`);
     };
 
     return (
@@ -146,7 +129,7 @@ const Expenses: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {expenses.map(expense => (
+                            {activeExpenses.map(expense => (
                                 <tr key={expense.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
                                     <td className="p-4">{expense.date}</td>
                                     <td className="p-4">{expense.category}</td>
@@ -155,8 +138,9 @@ const Expenses: React.FC = () => {
                                          {expense.status === 'pending_deletion' ? <span className="flex items-center text-yellow-500"><FileWarning size={16} className="mr-1"/>Pending Deletion</span> : <span className="flex items-center text-green-500"><CheckCircle size={16} className="mr-1"/>Active</span>}
                                     </td>
                                     <td className="p-4 text-right">{formatCurrency(expense.amount)}</td>
-                                    <td className="p-4 text-right no-print">
-                                        {hasPermission(Permission.EDIT_EXPENSE) && <button onClick={() => handleEdit(expense)} className="text-blue-500 hover:text-blue-700 mr-2"><Edit size={18} /></button>}
+                                    <td className="p-4 text-right no-print space-x-2">
+                                        {hasPermission(Permission.VIEW_AUDIT_TRAIL) && <button onClick={() => handleViewHistory(expense)} className="text-gray-500 hover:text-gray-700" title="View History"><History size={18} /></button>}
+                                        {hasPermission(Permission.EDIT_EXPENSE) && <button onClick={() => handleEdit(expense)} className="text-blue-500 hover:text-blue-700"><Edit size={18} /></button>}
                                         {hasPermission(Permission.REQUEST_DELETE_EXPENSE) && expense.status !== 'pending_deletion' && <button onClick={() => handleDeleteRequest(expense.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18} /></button>}
                                     </td>
                                 </tr>
@@ -173,6 +157,15 @@ const Expenses: React.FC = () => {
                     onCancel={() => { setIsModalOpen(false); setEditingExpense(undefined); }}
                 />
             </Modal>
+            
+            {editingExpense && (
+              <RecordHistoryModal
+                isOpen={isHistoryModalOpen}
+                onClose={() => setIsHistoryModalOpen(false)}
+                recordName={`Expense on ${editingExpense.date}`}
+                history={editingExpense.editHistory}
+              />
+            )}
         </div>
     );
 };

@@ -1,11 +1,11 @@
-
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Product, Permission } from '../types';
-import { Plus, Search, Edit, Trash2, FileWarning, CheckCircle, FileDown } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, FileWarning, CheckCircle, FileDown, History } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
+import RecordHistoryModal from '../components/ui/RecordHistoryModal';
 
 const ProductForm: React.FC<{ product?: Product; onSave: (product: Omit<Product, 'id'> | Product) => void; onCancel: () => void; }> = ({ product, onSave, onCancel }) => {
     const [formData, setFormData] = useState({
@@ -77,6 +77,7 @@ const Products: React.FC = () => {
     const { products, addProduct, updateProduct, requestDelete } = useAppContext();
     const { currentUser, hasPermission } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -85,9 +86,9 @@ const Products: React.FC = () => {
     const handleSave = (product: Omit<Product, 'id'> | Product) => {
         if (!currentUser) return;
         if ('id' in product) {
-            updateProduct(product, currentUser.id);
+            updateProduct(product);
         } else {
-            addProduct(product, currentUser.id);
+            addProduct(product as Omit<Product, 'id' | 'status' | 'isDeleted' | 'createdAt' | 'createdBy' | 'editHistory'>);
         }
         setIsModalOpen(false);
         setEditingProduct(undefined);
@@ -98,20 +99,29 @@ const Products: React.FC = () => {
         setIsModalOpen(true);
     };
 
+    const handleViewHistory = (product: Product) => {
+        setEditingProduct(product);
+        setIsHistoryModalOpen(true);
+    };
+
     const handleDeleteRequest = (id: string) => {
         if (currentUser && window.confirm('Are you sure you want to request deletion for this product? An administrator will need to approve it.')) {
-            requestDelete('product', id, currentUser.id);
+            requestDelete('product', id);
         }
     };
 
     const filteredProducts = products.filter(p =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        !p.isDeleted &&
+        (p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.category.toLowerCase().includes(searchQuery.toLowerCase())
+        p.category.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
     const handleExport = () => {
-        exportToCsv(filteredProducts, `products_${new Date().toISOString().split('T')[0]}`);
+        exportToCsv(filteredProducts.map(p => ({
+            id: p.id, name: p.name, sku: p.sku, category: p.category, 
+            purchasePrice: p.purchasePrice, salePrice: p.salePrice, stock: p.stock, unit: p.unit, status: p.status
+        })), `products_${new Date().toISOString().split('T')[0]}`);
     };
 
     return (
@@ -173,9 +183,10 @@ const Products: React.FC = () => {
                                         {product.status === 'pending_deletion' ? <span className="flex items-center text-yellow-500"><FileWarning size={16} className="mr-1"/>Pending Deletion</span> : <span className="flex items-center text-green-500"><CheckCircle size={16} className="mr-1"/>Active</span>}
                                     </td>
                                     <td className="p-4 text-right no-print space-x-2">
-                                        {hasPermission(Permission.EDIT_SALE) && <button onClick={() => handleEdit(product)} className="text-blue-500 hover:text-blue-700"><Edit size={18} /></button>}
+                                        {hasPermission(Permission.VIEW_AUDIT_TRAIL) && <button onClick={() => handleViewHistory(product)} className="text-gray-500 hover:text-gray-700" title="View History"><History size={18} /></button>}
+                                        {hasPermission(Permission.EDIT_SALE) && <button onClick={() => handleEdit(product)} className="text-blue-500 hover:text-blue-700" title="Edit"><Edit size={18} /></button>}
                                         {hasPermission(Permission.REQUEST_DELETE_SALE) && product.status !== 'pending_deletion' && (
-                                            <button onClick={() => handleDeleteRequest(product.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18} /></button>
+                                            <button onClick={() => handleDeleteRequest(product.id)} className="text-red-500 hover:text-red-700" title="Request Deletion"><Trash2 size={18} /></button>
                                         )}
                                     </td>
                                 </tr>
@@ -191,6 +202,14 @@ const Products: React.FC = () => {
                     onCancel={() => { setIsModalOpen(false); setEditingProduct(undefined); }}
                 />
             </Modal>
+            {editingProduct && (
+              <RecordHistoryModal
+                isOpen={isHistoryModalOpen}
+                onClose={() => setIsHistoryModalOpen(false)}
+                recordName={editingProduct.name}
+                history={editingProduct.editHistory}
+              />
+            )}
         </div>
     );
 };

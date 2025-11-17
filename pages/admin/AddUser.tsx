@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
@@ -31,10 +30,9 @@ const AddUser: React.FC = () => {
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        // Validation
         if (formData.password !== formData.confirmPassword) {
             setError('Passwords do not match.');
             return;
@@ -47,11 +45,12 @@ const AddUser: React.FC = () => {
         setIsLoading(true);
         try {
             const { password, confirmPassword, ...userData } = formData;
-            addUser(userData, password);
+            await addUser(userData, password);
             alert('User created successfully!');
             navigate('/admin/users');
         } catch (err: any) {
             setError(err.message || 'Failed to create user.');
+        } finally {
             setIsLoading(false);
         }
     };

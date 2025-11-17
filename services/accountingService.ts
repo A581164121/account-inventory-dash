@@ -11,20 +11,20 @@ interface AppState {
 }
 
 /**
- * Generates a Trial Balance exclusively from the general ledger (journal entries).
- * This is the single source of truth for all account balances.
+ * Generates a Trial Balance exclusively from active, approved journal entries.
  */
 export const generateTrialBalance = (state: AppState): TrialBalanceLine[] => {
     const balances: { [accountId: string]: { debit: number; credit: number } } = {};
     const { accounts, journalEntries } = state;
+    const activeJournalEntries = journalEntries.filter(je => !je.isDeleted && je.status === 'approved');
 
     // Initialize balances for all accounts
     accounts.forEach(acc => {
         balances[acc.id] = { debit: 0, credit: 0 };
     });
 
-    // Process all journal entries to calculate balances
-    journalEntries.forEach(je => {
+    // Process all active, approved journal entries to calculate balances
+    activeJournalEntries.forEach(je => {
         je.lines.forEach(line => {
             if (balances[line.accountId]) {
                 balances[line.accountId].debit += line.debit;
@@ -42,17 +42,18 @@ export const generateTrialBalance = (state: AppState): TrialBalanceLine[] => {
 };
 
 /**
- * Generates a detailed ledger for a specific account by filtering the main journal.
+ * Generates a detailed ledger for a specific account from active, approved journal entries.
  */
 export const generateLedgerForAccount = (accountId: string, state: AppState): LedgerEntry[] => {
     const transactions: Omit<LedgerEntry, 'balance'>[] = [];
     const { journalEntries, accounts } = state;
+    const activeJournalEntries = journalEntries.filter(je => !je.isDeleted && je.status === 'approved');
 
     const selectedAccount = accounts.find(a => a.id === accountId);
     if (!selectedAccount) return [];
 
     // Filter journal entries for transactions affecting the selected account
-    journalEntries.forEach(je => {
+    activeJournalEntries.forEach(je => {
         je.lines.forEach(line => {
             if (line.accountId === accountId) {
                 transactions.push({ date: je.date, description: je.description, debit: line.debit, credit: line.credit });
@@ -105,7 +106,7 @@ export const generateProfitAndLoss = (state: AppState) => {
     const netProfit = grossProfit - operatingExpenses;
 
     // For display, we can still list individual expense records
-    const expenseRecords = state.expenses;
+    const expenseRecords = state.expenses.filter(e => !e.isDeleted);
 
     return {
         revenue,
@@ -158,13 +159,13 @@ export const generateBalanceSheet = (state: AppState) => {
  * Uses high-level records for totals and JE-based reports for financial metrics.
  */
 export const getDashboardSummary = (state: AppState) => {
-    const totalSales = state.sales.reduce((sum, s) => sum + s.total, 0);
-    const totalPurchases = state.purchases.reduce((sum, p) => sum + p.total, 0);
-    const totalExpensesRecords = state.expenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalSales = state.sales.filter(s => !s.isDeleted).reduce((sum, s) => sum + s.total, 0);
+    const totalPurchases = state.purchases.filter(p => !p.isDeleted).reduce((sum, p) => sum + p.total, 0);
+    const totalExpensesRecords = state.expenses.filter(e => !e.isDeleted).reduce((sum, e) => sum + e.amount, 0);
     const { grossProfit, netProfit } = generateProfitAndLoss(state);
     
-    const totalProducts = state.products.length;
-    const lowStockProducts = state.products.filter(p => p.stock <= 10);
+    const totalProducts = state.products.filter(p => !p.isDeleted).length;
+    const lowStockProducts = state.products.filter(p => !p.isDeleted && p.stock <= 10);
 
     return { totalSales, totalPurchases, totalExpenses: totalExpensesRecords, grossProfit, netProfit, totalProducts, lowStockProducts };
 }
@@ -176,12 +177,12 @@ export const getChartData = (state: AppState) => {
     const salesByMonth: { [key: string]: number } = {};
     const purchasesByMonth: { [key: string]: number } = {};
 
-    [...state.sales].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(s => {
+    [...state.sales.filter(s => !s.isDeleted)].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(s => {
         const month = new Date(s.date).toLocaleString('default', { month: 'short' });
         salesByMonth[month] = (salesByMonth[month] || 0) + s.total;
     });
 
-    [...state.purchases].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(p => {
+    [...state.purchases.filter(p => !p.isDeleted)].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(p => {
         const month = new Date(p.date).toLocaleString('default', { month: 'short' });
         purchasesByMonth[month] = (purchasesByMonth[month] || 0) + p.total;
     });
@@ -196,8 +197,10 @@ export const getChartData = (state: AppState) => {
 
     const profitDataByMonth: { [key: string]: number } = {};
     const { accounts, journalEntries } = state;
+    const activeJournalEntries = journalEntries.filter(je => !je.isDeleted && je.status === 'approved');
+
     
-    [...journalEntries].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(je => {
+    [...activeJournalEntries].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(je => {
         const month = new Date(je.date).toLocaleString('default', { month: 'short' });
         if(!profitDataByMonth[month]) profitDataByMonth[month] = 0;
         

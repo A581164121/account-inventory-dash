@@ -12,14 +12,14 @@ const AdminPanel: React.FC = () => {
     const pendingRequests = approvalRequests.filter(r => r.status === 'pending');
 
     const handleApprove = (id: string) => {
-        if(currentUser && window.confirm('Are you sure you want to approve this request?')) {
-            approveRequest(id, currentUser.id);
+        if(currentUser && window.confirm('Are you sure you want to approve this request? The item will be marked as deleted.')) {
+            approveRequest(id);
         }
     };
     
     const handleReject = (id: string) => {
         if(currentUser && window.confirm('Are you sure you want to reject this request?')) {
-            rejectRequest(id, currentUser.id);
+            rejectRequest(id);
         }
     };
 

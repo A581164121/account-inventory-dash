@@ -1,11 +1,11 @@
-
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Customer, Permission } from '../types';
-import { Plus, Search, Edit, Trash2, FileWarning, CheckCircle, FileDown } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, FileWarning, CheckCircle, FileDown, History, ArrowUp, ArrowDown } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
+import RecordHistoryModal from '../components/ui/RecordHistoryModal';
 
 const CustomerForm: React.FC<{ customer?: Customer; onSave: (customer: Omit<Customer, 'id'> | Customer) => void; onCancel: () => void; }> = ({ customer, onSave, onCancel }) => {
     const [formData, setFormData] = useState({
@@ -57,15 +57,19 @@ const Customers: React.FC = () => {
     const { customers, addCustomer, updateCustomer, requestDelete } = useAppContext();
     const { currentUser, hasPermission } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>(undefined);
     const [searchQuery, setSearchQuery] = useState('');
+    
+    type SortableKeys = 'name' | 'email';
+    const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
 
     const handleSave = (customer: Omit<Customer, 'id'> | Customer) => {
         if (!currentUser) return;
         if ('id' in customer) {
-            updateCustomer(customer, currentUser.id);
+            updateCustomer(customer);
         } else {
-            addCustomer(customer, currentUser.id);
+            addCustomer(customer as Omit<Customer, 'id' | 'status' | 'isDeleted' | 'createdAt' | 'createdBy' | 'editHistory'>);
         }
         setIsModalOpen(false);
         setEditingCustomer(undefined);
@@ -76,19 +80,52 @@ const Customers: React.FC = () => {
         setIsModalOpen(true);
     };
 
+    const handleViewHistory = (customer: Customer) => {
+        setEditingCustomer(customer);
+        setIsHistoryModalOpen(true);
+    };
+
     const handleDeleteRequest = (id: string) => {
         if (currentUser && window.confirm('Are you sure you want to request deletion for this customer? An administrator will need to approve it.')) {
-            requestDelete('customer', id, currentUser.id);
+            requestDelete('customer', id);
         }
     };
     
-    const filteredCustomers = customers.filter(c => 
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.email.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const requestSort = (key: SortableKeys) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+    
+    const filteredCustomers = useMemo(() => {
+        const sorted = [...customers].sort((a, b) => {
+            if (a[sortConfig.key] < b[sortConfig.key]) {
+                return sortConfig.direction === 'asc' ? -1 : 1;
+            }
+            if (a[sortConfig.key] > b[sortConfig.key]) {
+                return sortConfig.direction === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+
+        return sorted.filter(c =>
+            !c.isDeleted &&
+            (c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.email.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+    }, [customers, searchQuery, sortConfig]);
 
     const handleExport = () => {
-        exportToCsv(filteredCustomers, `customers_${new Date().toISOString().split('T')[0]}`);
+        exportToCsv(filteredCustomers.map(c => ({ id: c.id, name: c.name, email: c.email, phone: c.phone, address: c.address, status: c.status})), `customers_${new Date().toISOString().split('T')[0]}`);
+    };
+
+    const getSortIcon = (key: SortableKeys) => {
+        if (sortConfig.key !== key) {
+            return null;
+        }
+        return sortConfig.direction === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />;
     };
 
     return (
@@ -127,8 +164,18 @@ const Customers: React.FC = () => {
                     <table className="w-full text-left">
                         <thead>
                             <tr className="bg-gray-100 dark:bg-gray-800">
-                                <th className="p-4 font-semibold">Name</th>
-                                <th className="p-4 font-semibold">Email</th>
+                                <th className="p-4 font-semibold">
+                                    <button onClick={() => requestSort('name')} className="flex items-center space-x-1 hover:text-primary transition-colors">
+                                        <span>Name</span>
+                                        {getSortIcon('name')}
+                                    </button>
+                                </th>
+                                <th className="p-4 font-semibold">
+                                    <button onClick={() => requestSort('email')} className="flex items-center space-x-1 hover:text-primary transition-colors">
+                                        <span>Email</span>
+                                        {getSortIcon('email')}
+                                    </button>
+                                </th>
                                 <th className="p-4 font-semibold">Phone</th>
                                 <th className="p-4 font-semibold">Address</th>
                                 <th className="p-4 font-semibold">Status</th>
@@ -146,9 +193,10 @@ const Customers: React.FC = () => {
                                         {customer.status === 'pending_deletion' ? <span className="flex items-center text-yellow-500"><FileWarning size={16} className="mr-1"/>Pending Deletion</span> : <span className="flex items-center text-green-500"><CheckCircle size={16} className="mr-1"/>Active</span>}
                                     </td>
                                     <td className="p-4 text-right no-print space-x-2">
-                                        {hasPermission(Permission.EDIT_CUSTOMER) && <button onClick={() => handleEdit(customer)} className="text-blue-500 hover:text-blue-700"><Edit size={18} /></button>}
+                                        {hasPermission(Permission.VIEW_AUDIT_TRAIL) && <button onClick={() => handleViewHistory(customer)} className="text-gray-500 hover:text-gray-700" title="View History"><History size={18} /></button>}
+                                        {hasPermission(Permission.EDIT_CUSTOMER) && <button onClick={() => handleEdit(customer)} className="text-blue-500 hover:text-blue-700" title="Edit"><Edit size={18} /></button>}
                                         {hasPermission(Permission.REQUEST_DELETE_CUSTOMER) && customer.status !== 'pending_deletion' && (
-                                          <button onClick={() => handleDeleteRequest(customer.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18} /></button>
+                                          <button onClick={() => handleDeleteRequest(customer.id)} className="text-red-500 hover:text-red-700" title="Request Deletion"><Trash2 size={18} /></button>
                                         )}
                                     </td>
                                 </tr>
@@ -165,6 +213,15 @@ const Customers: React.FC = () => {
                     onCancel={() => { setIsModalOpen(false); setEditingCustomer(undefined); }}
                 />
             </Modal>
+
+            {editingCustomer && (
+              <RecordHistoryModal
+                isOpen={isHistoryModalOpen}
+                onClose={() => setIsHistoryModalOpen(false)}
+                recordName={editingCustomer.name}
+                history={editingCustomer.editHistory}
+              />
+            )}
         </div>
     );
 };

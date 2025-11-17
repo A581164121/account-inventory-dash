@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Home, Users, Truck, Package, ShoppingCart, Briefcase, DollarSign, BookOpen, BarChart2, FileText, PieChart, Activity, RefreshCw, Shield, List, UserCheck } from 'lucide-react';
+import { Home, Users, Truck, Package, ShoppingCart, Briefcase, DollarSign, BookOpen, BarChart2, FileText, PieChart, Activity, RefreshCw, Shield, List, UserCheck, Database } from 'lucide-react';
 import { Permission } from './types';
 
 export const NAV_LINKS = [
@@ -29,4 +29,5 @@ export const ADMIN_LINKS = [
     { name: 'Roles & Permissions', path: '/admin/roles', icon: <UserCheck size={20} />, permission: Permission.MANAGE_ROLES },
     { name: 'Activity Log', path: '/admin/activity-log', icon: <List size={20} />, permission: Permission.VIEW_ACTIVITY_LOG },
     { name: 'Company Settings', path: '/admin/brand-settings', icon: <Briefcase size={20} />, permission: Permission.MANAGE_BRANDING },
+    { name: 'Data Management', path: '/admin/data-management', icon: <Database size={20} />, permission: Permission.MANAGE_DATA_BACKUP },
 ];

@@ -24,19 +24,25 @@ import AddUser from './pages/admin/AddUser';
 import Roles from './pages/admin/Roles';
 import ActivityLog from './pages/admin/ActivityLog';
 import BrandSettings from './pages/admin/BrandSettings';
+import DataManagement from './pages/admin/DataManagement';
 import LoginModal from './components/auth/LoginModal';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { useAuth } from './context/auth';
+import { useAppContext } from './context/AppContext';
 import { Permission } from './types';
 
-const App: React.FC = () => {
-  const { currentUser } = useAuth();
+const MainApp: React.FC = () => {
+    const { isDataLoading } = useAppContext();
 
-  return (
-    <>
-      {!currentUser ? (
-        <LoginModal />
-      ) : (
+    if (isDataLoading) {
+        return (
+            <div className="flex h-screen bg-light dark:bg-dark items-center justify-center">
+                <div className="text-xl font-semibold">Loading Business Data...</div>
+            </div>
+        );
+    }
+    
+    return (
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<ProtectedRoute permission={Permission.VIEW_DASHBOARD}><Dashboard /></ProtectedRoute>} />
@@ -63,10 +69,24 @@ const App: React.FC = () => {
             <Route path="admin/roles" element={<ProtectedRoute permission={Permission.MANAGE_ROLES}><Roles /></ProtectedRoute>} />
             <Route path="admin/activity-log" element={<ProtectedRoute permission={Permission.VIEW_ACTIVITY_LOG}><ActivityLog /></ProtectedRoute>} />
             <Route path="admin/brand-settings" element={<ProtectedRoute permission={Permission.MANAGE_BRANDING}><BrandSettings /></ProtectedRoute>} />
+            <Route path="admin/data-management" element={<ProtectedRoute permission={Permission.MANAGE_DATA_BACKUP}><DataManagement /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
+    )
+}
+
+
+const App: React.FC = () => {
+  const { currentUser } = useAuth();
+
+  return (
+    <>
+      {!currentUser ? (
+        <LoginModal />
+      ) : (
+        <MainApp />
       )}
     </>
   );

@@ -12,6 +12,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.MANAGE_ROLES,
     Permission.VIEW_ACTIVITY_LOG,
     Permission.MANAGE_BRANDING,
+    Permission.MANAGE_DATA_BACKUP,
     Permission.APPROVE_DELETE_CUSTOMER,
     Permission.APPROVE_DELETE_SALE,
     Permission.APPROVE_DELETE_PURCHASE,
@@ -20,6 +21,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.APPROVE_JOURNAL_ENTRY,
     Permission.APPROVE_PURCHASE,
     Permission.APPROVE_SALE_EDIT,
+    Permission.VIEW_AUDIT_TRAIL,
     // Can also view everything
     ...Object.values(Permission).filter(p => p.startsWith('VIEW_')),
   ],
@@ -84,6 +86,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.VIEW_EXPENSE,
     Permission.EDIT_EXPENSE,
     Permission.REQUEST_DELETE_EXPENSE,
+    Permission.VIEW_AUDIT_TRAIL,
   ],
   [UserRole.GENERAL_LEDGER_STAFF]: [
     Permission.VIEW_DASHBOARD,
