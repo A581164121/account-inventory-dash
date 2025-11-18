@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Sale, Expense, JournalEntry, Account } from '../types';
@@ -8,8 +9,14 @@ import { exportToCsv } from '../services/exportService';
 
 const Reports: React.FC = () => {
     const appState = useAppContext();
-    const [startDate, setStartDate] = useState<string>('');
-    const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    
+    // Default to current month
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    const currentDay = today.toISOString().split('T')[0];
+
+    const [startDate, setStartDate] = useState<string>(firstDayOfMonth);
+    const [endDate, setEndDate] = useState<string>(currentDay);
 
     const filteredState = useMemo(() => {
         if (!startDate || !endDate) return appState;
@@ -20,7 +27,10 @@ const Reports: React.FC = () => {
         const filterByDate = <T extends { date: string }>(items: T[]): T[] => {
             return items.filter(item => {
                 const itemDate = new Date(item.date).getTime();
-                return itemDate >= start && itemDate <= end;
+                // Simple date comparison. Note: Date input value is YYYY-MM-DD.
+                // Creating date from string assumes UTC if YYYY-MM-DD. 
+                // To be safe with timezones, we can compare string values if format is ISO YYYY-MM-DD
+                return item.date >= startDate && item.date <= endDate;
             });
         };
 
@@ -91,14 +101,12 @@ const Reports: React.FC = () => {
                 </div>
             </div>
 
-            {startDate && endDate && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
-                    <Card title="Total Sales" value={formatCurrency(reportData.totalSales)} icon={<DollarSign size={24} className="text-white"/>} colorClass="bg-blue-500" />
-                    <Card title="Total Expenses" value={formatCurrency(reportData.totalExpenses)} icon={<DollarSign size={24} className="text-white"/>} colorClass="bg-red-500" />
-                    <Card title="Gross Profit" value={formatCurrency(reportData.grossProfit)} icon={<TrendingUp size={24} className="text-white"/>} colorClass="bg-yellow-500" />
-                    <Card title="Net Profit" value={formatCurrency(reportData.netProfit)} icon={<BarChart size={24} className="text-white"/>} colorClass="bg-purple-500" />
-                </div>
-            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
+                <Card title="Total Sales" value={formatCurrency(reportData.totalSales)} icon={<DollarSign size={24} className="text-white"/>} colorClass="bg-blue-500" />
+                <Card title="Total Expenses" value={formatCurrency(reportData.totalExpenses)} icon={<DollarSign size={24} className="text-white"/>} colorClass="bg-red-500" />
+                <Card title="Gross Profit" value={formatCurrency(reportData.grossProfit)} icon={<TrendingUp size={24} className="text-white"/>} colorClass="bg-yellow-500" />
+                <Card title="Net Profit" value={formatCurrency(reportData.netProfit)} icon={<BarChart size={24} className="text-white"/>} colorClass="bg-purple-500" />
+            </div>
         </div>
     );
 };

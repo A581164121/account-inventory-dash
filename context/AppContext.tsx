@@ -1,10 +1,11 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-// Fix: Import JournalEntryLine type to resolve type error.
-import { Customer, Supplier, Product, Sale, Purchase, Expense, JournalEntry, Account, User, Department, ActivityLog, ApprovalRequest, RecordType, ThemeColors, CompanyProfile, LogoUrl, EditLog, UserRole, JournalEntryLine } from '../types';
+
+import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
+import { Customer, Supplier, Product, Sale, Purchase, Expense, JournalEntry, Account, User, Department, ActivityLog, ApprovalRequest, RecordType, ThemeColors, CompanyProfile, LogoUrl, EditLog, JournalEntryLine } from '../types';
 import { useAuth } from './auth';
 import { initializeInvoiceSequences, commitInvoiceNumber } from '../services/invoiceNumberService';
 import { dbService } from '../services/storageService';
 import { fakeHash } from '../utils/auth';
+import { supabase } from '../services/supabaseClient';
 
 const defaultTheme: ThemeColors = {
   id: 'themeColors',
@@ -45,6 +46,8 @@ interface AppContextType {
   themeColors: ThemeColors;
   companyProfile: CompanyProfile;
   isDataLoading: boolean;
+
+  refreshData: () => Promise<void>;
 
   setLogoUrl: (url: string | null) => Promise<void>;
   setThemeColors: (colors: ThemeColors) => Promise<void>;
@@ -107,51 +110,88 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [themeColors, setThemeColorsState] = useState<ThemeColors>(defaultTheme);
   const [companyProfile, setCompanyProfileState] = useState<CompanyProfile>(defaultCompanyProfile);
 
-  // Data Loading Effect
+  const loadData = useCallback(async () => {
+      setIsDataLoading(true);
+      try {
+          await dbService.seedInitialData();
+          const [
+              customersData, suppliersData, productsData, salesData, purchasesData,
+              expensesData, journalEntriesData, accountsData, usersData, departmentsData,
+              activityLogData, approvalRequestsData, settingsData
+          ] = await Promise.all([
+              dbService.getAll<Customer>('customers'), dbService.getAll<Supplier>('suppliers'),
+              dbService.getAll<Product>('products'), dbService.getAll<Sale>('sales'),
+              dbService.getAll<Purchase>('purchases'), dbService.getAll<Expense>('expenses'),
+              dbService.getAll<JournalEntry>('journal_entries'), dbService.getAll<Account>('accounts'),
+              dbService.getAll<User>('users'), dbService.getAll<Department>('departments'),
+              dbService.getAll<ActivityLog>('activity_log'), dbService.getAll<ApprovalRequest>('approval_requests'),
+              dbService.getAll<any>('settings'),
+          ]);
+
+          setCustomers(customersData); setSuppliers(suppliersData); setProducts(productsData);
+          setSales(salesData); setPurchases(purchasesData); setExpenses(expensesData);
+          setJournalEntries(journalEntriesData); setAccounts(accountsData); setUsers(usersData);
+          setDepartments(departmentsData); setActivityLog(activityLogData); setApprovalRequests(approvalRequestsData);
+          
+          const companyProfileSetting = settingsData.find(s => s.id === 'companyProfile');
+          setCompanyProfileState(companyProfileSetting || defaultCompanyProfile);
+          
+          const themeColorsSetting = settingsData.find(s => s.id === 'themeColors');
+          setThemeColorsState(themeColorsSetting || defaultTheme);
+
+          const logoUrlSetting = settingsData.find(s => s.id === 'logoUrl');
+          setLogoUrlState(logoUrlSetting ? logoUrlSetting.url : defaultLogoUrl.url);
+          
+          initializeInvoiceSequences(salesData, purchasesData);
+
+      } catch (error) {
+          console.error("Failed to load data from Supabase", error);
+      } finally {
+          setIsDataLoading(false);
+      }
+  }, []);
+
+  // Initial Data Load
   useEffect(() => {
-    const loadData = async () => {
-        setIsDataLoading(true);
-        try {
-            await dbService.seedInitialData();
-            const [
-                customersData, suppliersData, productsData, salesData, purchasesData,
-                expensesData, journalEntriesData, accountsData, usersData, departmentsData,
-                activityLogData, approvalRequestsData, settingsData
-            ] = await Promise.all([
-                dbService.getAll<Customer>('customers'), dbService.getAll<Supplier>('suppliers'),
-                dbService.getAll<Product>('products'), dbService.getAll<Sale>('sales'),
-                dbService.getAll<Purchase>('purchases'), dbService.getAll<Expense>('expenses'),
-                dbService.getAll<JournalEntry>('journal_entries'), dbService.getAll<Account>('accounts'),
-                dbService.getAll<User>('users'), dbService.getAll<Department>('departments'),
-                dbService.getAll<ActivityLog>('activity_log'), dbService.getAll<ApprovalRequest>('approval_requests'),
-                dbService.getAll<any>('settings'),
-            ]);
-
-            setCustomers(customersData); setSuppliers(suppliersData); setProducts(productsData);
-            setSales(salesData); setPurchases(purchasesData); setExpenses(expensesData);
-            setJournalEntries(journalEntriesData); setAccounts(accountsData); setUsers(usersData);
-            setDepartments(departmentsData); setActivityLog(activityLogData); setApprovalRequests(approvalRequestsData);
-            
-            const companyProfileSetting = settingsData.find(s => s.id === 'companyProfile');
-            setCompanyProfileState(companyProfileSetting || defaultCompanyProfile);
-            
-            const themeColorsSetting = settingsData.find(s => s.id === 'themeColors');
-            setThemeColorsState(themeColorsSetting || defaultTheme);
-
-            const logoUrlSetting = settingsData.find(s => s.id === 'logoUrl');
-            setLogoUrlState(logoUrlSetting ? logoUrlSetting.url : defaultLogoUrl.url);
-            
-            initializeInvoiceSequences(salesData, purchasesData);
-
-        } catch (error) {
-            console.error("Failed to load data from IndexedDB", error);
-        } finally {
-            setIsDataLoading(false);
-        }
-    };
-    if (authInitialized) { // Load data after auth system has checked for users
+    if (authInitialized) {
         loadData();
     }
+  }, [authInitialized, loadData]);
+
+  // Realtime Subscription
+  useEffect(() => {
+      if (!authInitialized) return;
+
+      console.log("Setting up Supabase Realtime subscriptions...");
+
+      const channel = supabase.channel('db_changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_entries' }, (payload) => {
+              console.log('Realtime change in journal_entries:', payload);
+              dbService.getAll<JournalEntry>('journal_entries').then(setJournalEntries);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => {
+              dbService.getAll<Sale>('sales').then(setSales);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'purchases' }, () => {
+              dbService.getAll<Purchase>('purchases').then(setPurchases);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => {
+              dbService.getAll<Expense>('expenses').then(setExpenses);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+              dbService.getAll<Product>('products').then(setProducts);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
+              dbService.getAll<Customer>('customers').then(setCustomers);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'suppliers' }, () => {
+              dbService.getAll<Supplier>('suppliers').then(setSuppliers);
+          })
+          .subscribe();
+
+      return () => {
+          supabase.removeChannel(channel);
+      };
   }, [authInitialized]);
 
   const logActivity = async (action: string, details: string) => {
@@ -173,8 +213,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const createAuditable = <T extends object>(item: T, idPrefix: string): T & { id: string; status: 'active'; isDeleted: boolean; createdAt: string; createdBy: string; editHistory: EditLog[]; } => {
     if (!currentUser) throw new Error("No authenticated user.");
-    return {
-        ...item,
+    
+    const defaults = {
         id: `${idPrefix}-${Date.now()}`,
         status: 'active',
         isDeleted: false,
@@ -182,6 +222,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         createdBy: currentUser.id,
         editHistory: [],
     };
+
+    return {
+        ...defaults,
+        ...item,
+    } as any;
   }
 
   // --- SETTINGS ---
@@ -224,6 +269,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const newCustomer = createAuditable(customer, 'CUST');
       try {
           await dbService.upsertItem('customers', newCustomer);
+          // Optimistic update (will be overwritten by realtime if active)
           setCustomers(prev => [...prev, newCustomer]);
           await logActivity('Create Customer', `ID: ${newCustomer.id}, Name: ${newCustomer.name}`);
       } catch (error) {
@@ -356,7 +402,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const cogsAndInventoryLines: JournalEntryLine[] = [];
         const updatedProducts: Product[] = [];
 
-        // 1. Update product stock
         for (const item of sale.items) {
             const product = products.find(p => p.id === item.productId);
             if (!product || product.stock < item.quantity) {
@@ -370,7 +415,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             updatedProducts.push(updatedProduct);
         }
 
-        // 2. Create Journal Entry
         const newJournalEntry: Omit<JournalEntry, 'id' | 'isDeleted' | 'createdAt' | 'createdBy' | 'editHistory'> = {
             date: sale.date,
             description: `Sale to ${customerName} - Inv #${sale.invoiceNumber}`,
@@ -386,12 +430,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const createdJournalEntry = await postJournalEntry(newJournalEntry);
         newSale.journalEntryId = createdJournalEntry.id;
         
-        // 3. Save all changes
         await dbService.upsertItem('sales', newSale);
         commitInvoiceNumber('sale', newSale.customerId, newSale.invoiceNumber);
+        
         for(const p of updatedProducts) { await dbService.upsertItem('products', p); }
 
-        // 4. Update state
         setSales(prev => [newSale, ...prev]);
         setProducts(prev => prev.map(p => updatedProducts.find(up => up.id === p.id) || p));
         await logActivity('Create Sale', `ID: ${newSale.id}, Total: ${newSale.total}`);
@@ -399,7 +442,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } catch(error) {
         console.error("Failed to add sale:", error);
         alert(`Failed to add sale: ${(error as Error).message}`);
-        throw error; // Re-throw to be caught by the form handler
+        throw error;
       }
   };
   
@@ -411,7 +454,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const supplierName = suppliers.find(s => s.id === purchase.supplierId)?.name || 'N/A';
         const updatedProducts: Product[] = [];
 
-        // 1. Update product stock
         for (const item of purchase.items) {
             const product = products.find(p => p.id === item.productId);
             if (!product) throw new Error(`Product with ID ${item.productId} not found.`);
@@ -419,7 +461,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             updatedProducts.push(updatedProduct);
         }
 
-        // 2. Create Journal Entry
         const newJournalEntry: Omit<JournalEntry, 'id' | 'isDeleted' | 'createdAt' | 'createdBy' | 'editHistory'> = {
             date: purchase.date,
             description: `Purchase from ${supplierName} - Inv #${purchase.invoiceNumber}`,
@@ -433,12 +474,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const createdJournalEntry = await postJournalEntry(newJournalEntry);
         newPurchase.journalEntryId = createdJournalEntry.id;
 
-        // 3. Save changes
         await dbService.upsertItem('purchases', newPurchase);
         commitInvoiceNumber('purchase', newPurchase.supplierId, newPurchase.invoiceNumber);
+        
         for (const p of updatedProducts) { await dbService.upsertItem('products', p); }
 
-        // 4. Update state
         setPurchases(prev => [newPurchase, ...prev]);
         setProducts(prev => prev.map(p => updatedProducts.find(up => up.id === p.id) || p));
         await logActivity('Create Purchase', `ID: ${newPurchase.id}, Total: ${newPurchase.total}`);
@@ -455,9 +495,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const newExpense = createAuditable({ ...expense, status: 'approved', departmentId: currentUser.departmentId }, 'EXP');
       
       const expenseAccount = accounts.find(a => a.name.toLowerCase().includes(newExpense.category.toLowerCase()) && a.type === 'Expense') 
-                                || accounts.find(a => a.id === '503'); // Default to Utilities
+                                || accounts.find(a => a.id === '503'); 
       if (!expenseAccount) {
-          throw new Error(`Could not find an expense account for category: ${newExpense.category}. Please check account setup.`);
+          throw new Error(`Could not find an expense account for category: ${newExpense.category}.`);
       }
       try {
         const newJournalEntry: Omit<JournalEntry, 'id' | 'isDeleted' | 'createdAt' | 'createdBy' | 'editHistory'> = {
@@ -520,7 +560,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
   
-    // User Management Functions
   const addUser = async (userData: Omit<User, 'id' | 'passwordHash' | 'createdAt'>, password: string): Promise<User> => {
     const newUser: User = {
         ...userData,
@@ -569,7 +608,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
   };
 
-  // --- Workflow ---
   const requestDelete = async (recordType: RecordType, recordId: string) => {
     if (!currentUser) return;
     const newRequest: ApprovalRequest = {
@@ -708,6 +746,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     customers, suppliers, products, sales, purchases, expenses, journalEntries, accounts,
     users, departments, activityLog, approvalRequests,
     logoUrl: logoUrl, themeColors, companyProfile, isDataLoading,
+    refreshData: loadData,
     setLogoUrl, setThemeColors, setCompanyProfile,
     addCustomer, updateCustomer,
     addSupplier, updateSupplier,

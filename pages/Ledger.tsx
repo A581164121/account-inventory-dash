@@ -1,13 +1,15 @@
+
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateLedgerForAccount } from '../services/accountingService';
-import { Printer, FileDown } from 'lucide-react';
+import { Printer, FileDown, RefreshCw } from 'lucide-react';
 import { exportToCsv, exportToPdf } from '../services/exportService';
 
 const Ledger: React.FC = () => {
     const appState = useAppContext();
-    const { accounts } = appState;
+    const { accounts, refreshData } = appState;
     const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const ledgerData = useMemo(() => {
         if (!selectedAccountId) return [];
@@ -21,6 +23,12 @@ const Ledger: React.FC = () => {
 
     const handlePrint = () => {
         window.print();
+    };
+
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await refreshData();
+        setIsRefreshing(false);
     };
 
     const handleExportCsv = () => {
@@ -38,6 +46,10 @@ const Ledger: React.FC = () => {
             <div className="flex justify-between items-center mb-6 no-print">
                 <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Ledger</h1>
                  <div className="flex space-x-2">
+                    <button onClick={handleRefresh} disabled={isRefreshing} className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-gray-300 dark:hover:bg-gray-600">
+                        <RefreshCw size={20} className={`${isRefreshing ? 'animate-spin' : ''}`} />
+                        <span>Refresh</span>
+                    </button>
                     <button onClick={handlePrint} className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-gray-300 dark:hover:bg-gray-600">
                         <Printer size={20} />
                         <span>Print</span>
