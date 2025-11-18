@@ -14,7 +14,7 @@ const Header: React.FC<HeaderProps> = ({ setSidebarOpen }) => {
   const { logoUrl } = useAppContext();
 
   return (
-    <header className="flex justify-between items-center py-4 px-6 bg-white dark:bg-dark-secondary border-b-2 border-gray-200 dark:border-gray-700">
+    <header className="flex justify-between items-center py-4 px-6 bg-white dark:bg-dark-secondary border-b-2 border-gray-200 dark:border-gray-700 no-print">
       <div className="flex items-center">
         <button onClick={() => setSidebarOpen(true)} className="text-gray-500 focus:outline-none lg:hidden">
           <Menu size={24} />

@@ -1,8 +1,10 @@
+
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Product, Permission } from '../types';
 import { Plus, Search, Edit, Trash2, FileWarning, CheckCircle, FileDown, History } from 'lucide-react';
 import Modal from '../components/ui/Modal';
+import ConfirmationModal from '../components/ui/ConfirmationModal';
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
 import RecordHistoryModal from '../components/ui/RecordHistoryModal';
@@ -80,6 +82,7 @@ const Products: React.FC = () => {
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
     const [searchQuery, setSearchQuery] = useState('');
+    const [deleteId, setDeleteId] = useState<string | null>(null);
 
     const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
@@ -104,10 +107,15 @@ const Products: React.FC = () => {
         setIsHistoryModalOpen(true);
     };
 
-    const handleDeleteRequest = (id: string) => {
-        if (currentUser && window.confirm('Are you sure you want to request deletion for this product? An administrator will need to approve it.')) {
-            requestDelete('product', id);
+    const handleDeleteClick = (id: string) => {
+        setDeleteId(id);
+    };
+
+    const handleConfirmDelete = () => {
+        if (currentUser && deleteId) {
+            requestDelete('product', deleteId);
         }
+        setDeleteId(null);
     };
 
     const filteredProducts = products.filter(p =>
@@ -186,7 +194,7 @@ const Products: React.FC = () => {
                                         {hasPermission(Permission.VIEW_AUDIT_TRAIL) && <button onClick={() => handleViewHistory(product)} className="text-gray-500 hover:text-gray-700" title="View History"><History size={18} /></button>}
                                         {hasPermission(Permission.EDIT_SALE) && <button onClick={() => handleEdit(product)} className="text-blue-500 hover:text-blue-700" title="Edit"><Edit size={18} /></button>}
                                         {hasPermission(Permission.REQUEST_DELETE_SALE) && product.status !== 'pending_deletion' && (
-                                            <button onClick={() => handleDeleteRequest(product.id)} className="text-red-500 hover:text-red-700" title="Request Deletion"><Trash2 size={18} /></button>
+                                            <button onClick={() => handleDeleteClick(product.id)} className="text-red-500 hover:text-red-700" title="Request Deletion"><Trash2 size={18} /></button>
                                         )}
                                     </td>
                                 </tr>
@@ -202,6 +210,16 @@ const Products: React.FC = () => {
                     onCancel={() => { setIsModalOpen(false); setEditingProduct(undefined); }}
                 />
             </Modal>
+            
+            <ConfirmationModal
+                isOpen={!!deleteId}
+                onClose={() => setDeleteId(null)}
+                onConfirm={handleConfirmDelete}
+                title="Confirm Deletion Request"
+                message="Are you sure you want to request deletion for this product? An administrator will need to approve it."
+                confirmText="Request Deletion"
+            />
+
             {editingProduct && (
               <RecordHistoryModal
                 isOpen={isHistoryModalOpen}

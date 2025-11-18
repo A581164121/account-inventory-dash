@@ -1,8 +1,10 @@
+
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { JournalEntry, Permission, JournalEntryLine } from '../types';
 import { Plus, Trash2, CheckSquare, Clock, FileDown, FileWarning } from 'lucide-react';
 import Modal from '../components/ui/Modal';
+import ConfirmationModal from '../components/ui/ConfirmationModal';
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
 
@@ -19,7 +21,9 @@ const JournalEntryForm: React.FC<{
     ]);
     const [error, setError] = useState('');
 
-    const handleLineChange = (index: number, field: keyof Omit<JournalEntryLine, 'balance'>, value: string) => {
+    // Fix: Narrow down the type of `field` to only include the keys being modified by this form.
+    // This resolves the error where a `number` was being assigned to a property that could be a `string`.
+    const handleLineChange = (index: number, field: 'accountId' | 'debit' | 'credit', value: string) => {
         const newLines = [...lines];
         const line = newLines[index];
 
@@ -139,6 +143,7 @@ const JournalEntries: React.FC = () => {
     const { journalEntries, accounts, postJournalEntry, approveJournalEntry, requestDelete } = useAppContext();
     const { currentUser, hasPermission } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [deleteId, setDeleteId] = useState<string | null>(null);
     
     const getAccountName = (id: string) => accounts.find(a => a.id === id)?.name || 'N/A';
     const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -162,10 +167,15 @@ const JournalEntries: React.FC = () => {
         }
     };
 
-    const handleDeleteRequest = (entryId: string) => {
-        if (currentUser && window.confirm('Are you sure you want to request deletion for this journal entry? An administrator will need to approve it.')) {
-            requestDelete('journal_entry', entryId);
+    const handleDeleteClick = (entryId: string) => {
+        setDeleteId(entryId);
+    };
+
+    const handleConfirmDelete = () => {
+        if (currentUser && deleteId) {
+            requestDelete('journal_entry', deleteId);
         }
+        setDeleteId(null);
     };
 
     const handleExport = () => {
@@ -217,7 +227,7 @@ const JournalEntries: React.FC = () => {
                                     <button onClick={() => handleApprove(entry.id)} className="bg-green-500 text-white px-3 py-1 text-sm rounded-lg hover:bg-green-600">Approve</button>
                                 )}
                                 {hasPermission(Permission.REQUEST_DELETE_JOURNAL_ENTRY) && entry.status === 'approved' && (
-                                    <button onClick={() => handleDeleteRequest(entry.id)} className="text-red-500 hover:text-red-700" title="Request Deletion"><Trash2 size={18} /></button>
+                                    <button onClick={() => handleDeleteClick(entry.id)} className="text-red-500 hover:text-red-700" title="Request Deletion"><Trash2 size={18} /></button>
                                 )}
                             </div>
                         </div>
@@ -245,6 +255,15 @@ const JournalEntries: React.FC = () => {
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Journal Entry">
                  <JournalEntryForm onSave={handleSave} onCancel={() => setIsModalOpen(false)} />
             </Modal>
+
+            <ConfirmationModal
+                isOpen={!!deleteId}
+                onClose={() => setDeleteId(null)}
+                onConfirm={handleConfirmDelete}
+                title="Confirm Deletion Request"
+                message="Are you sure you want to request deletion for this journal entry? An administrator will need to approve it."
+                confirmText="Request Deletion"
+            />
         </div>
     );
 };

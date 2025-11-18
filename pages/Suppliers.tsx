@@ -1,8 +1,10 @@
+
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Supplier, Permission } from '../types';
 import { Plus, Search, Edit, Trash2, FileWarning, CheckCircle, FileDown, History } from 'lucide-react';
 import Modal from '../components/ui/Modal';
+import ConfirmationModal from '../components/ui/ConfirmationModal';
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
 import RecordHistoryModal from '../components/ui/RecordHistoryModal';
@@ -59,6 +61,7 @@ const Suppliers: React.FC = () => {
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState<Supplier | undefined>(undefined);
     const [searchQuery, setSearchQuery] = useState('');
+    const [deleteId, setDeleteId] = useState<string | null>(null);
 
     const handleSave = (supplier: Omit<Supplier, 'id'> | Supplier) => {
         if (!currentUser) return;
@@ -81,10 +84,15 @@ const Suppliers: React.FC = () => {
         setIsHistoryModalOpen(true);
     };
 
-    const handleDeleteRequest = (id: string) => {
-        if (currentUser && window.confirm('Are you sure you want to request deletion for this supplier? An administrator will need to approve it.')) {
-            requestDelete('supplier', id);
+    const handleDeleteClick = (id: string) => {
+        setDeleteId(id);
+    };
+
+    const handleConfirmDelete = () => {
+        if (currentUser && deleteId) {
+            requestDelete('supplier', deleteId);
         }
+        setDeleteId(null);
     };
     
     const filteredSuppliers = suppliers.filter(s => 
@@ -155,7 +163,7 @@ const Suppliers: React.FC = () => {
                                         {hasPermission(Permission.VIEW_AUDIT_TRAIL) && <button onClick={() => handleViewHistory(supplier)} className="text-gray-500 hover:text-gray-700" title="View History"><History size={18} /></button>}
                                         {hasPermission(Permission.EDIT_PURCHASE) && <button onClick={() => handleEdit(supplier)} className="text-blue-500 hover:text-blue-700" title="Edit"><Edit size={18} /></button>}
                                         {hasPermission(Permission.REQUEST_DELETE_PURCHASE) && supplier.status !== 'pending_deletion' && (
-                                            <button onClick={() => handleDeleteRequest(supplier.id)} className="text-red-500 hover:text-red-700" title="Request Deletion"><Trash2 size={18} /></button>
+                                            <button onClick={() => handleDeleteClick(supplier.id)} className="text-red-500 hover:text-red-700" title="Request Deletion"><Trash2 size={18} /></button>
                                         )}
                                     </td>
                                 </tr>
@@ -171,6 +179,15 @@ const Suppliers: React.FC = () => {
                     onCancel={() => { setIsModalOpen(false); setEditingSupplier(undefined); }}
                 />
             </Modal>
+
+            <ConfirmationModal
+                isOpen={!!deleteId}
+                onClose={() => setDeleteId(null)}
+                onConfirm={handleConfirmDelete}
+                title="Confirm Deletion Request"
+                message="Are you sure you want to request deletion for this supplier? An administrator will need to approve it."
+                confirmText="Request Deletion"
+            />
 
             {editingSupplier && (
               <RecordHistoryModal

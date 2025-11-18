@@ -1,18 +1,21 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Search, Eye, FileWarning, CheckCircle, Printer, FileDown } from 'lucide-react';
 import Modal from '../components/ui/Modal';
+import ConfirmationModal from '../components/ui/ConfirmationModal';
 import { Trash2 } from 'lucide-react';
 import { Sale, Permission, UserRole, PaymentMethod } from '../types';
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
-import { getNextSaleInvoiceNumber, commitInvoiceNumber } from '../services/invoiceNumberService';
+import { getNextSaleInvoiceNumber } from '../services/invoiceNumberService';
 
 const Sales: React.FC = () => {
     const { sales, addSale, customers, products, requestDelete, companyProfile } = useAppContext();
     const { currentUser, hasPermission } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [deleteId, setDeleteId] = useState<string | null>(null);
 
     const salesTaxRate = companyProfile.salesTaxRate || 0;
     const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -44,7 +47,7 @@ const Sales: React.FC = () => {
         } else if (!customerId) {
             setInvoiceNumber('');
         }
-    }, [customerId, customers, sales, isModalOpen]);
+    }, [customerId, customers, isModalOpen]);
 
     const handleAddItem = () => setItems([...items, { productId: '', quantity: 1, price: 0 }]);
     const handleRemoveItem = (index: number) => setItems(items.filter((_, i) => i !== index));
@@ -76,10 +79,15 @@ const Sales: React.FC = () => {
         setItems([{ productId: '', quantity: 1, price: 0 }]);
     };
 
-    const handleDeleteRequest = (saleId: string) => {
-        if (currentUser && window.confirm('Are you sure you want to request deletion for this sale? An administrator will need to approve it.')) {
-            requestDelete('sale', saleId);
+    const handleDeleteClick = (saleId: string) => {
+        setDeleteId(saleId);
+    };
+
+    const handleConfirmDelete = () => {
+        if (currentUser && deleteId) {
+            requestDelete('sale', deleteId);
         }
+        setDeleteId(null);
     };
 
     const handleExport = () => {
@@ -115,7 +123,6 @@ const Sales: React.FC = () => {
                 departmentId: currentUser.departmentId,
             };
             await addSale(newSaleData);
-            commitInvoiceNumber('sale', customerId, invoiceNumber);
 
             setIsModalOpen(false);
             resetForm();
@@ -174,7 +181,7 @@ const Sales: React.FC = () => {
                                             <Printer size={18} />
                                         </Link>
                                         {hasPermission(Permission.REQUEST_DELETE_SALE) && sale.status === 'approved' && (
-                                            <button onClick={() => handleDeleteRequest(sale.id)} className="text-red-500 hover:text-red-700" title="Request Deletion">
+                                            <button onClick={() => handleDeleteClick(sale.id)} className="text-red-500 hover:text-red-700" title="Request Deletion">
                                                 <Trash2 size={18} />
                                             </button>
                                         )}
@@ -259,6 +266,15 @@ const Sales: React.FC = () => {
                     </div>
                 </form>
             </Modal>
+
+            <ConfirmationModal
+                isOpen={!!deleteId}
+                onClose={() => setDeleteId(null)}
+                onConfirm={handleConfirmDelete}
+                title="Confirm Deletion Request"
+                message="Are you sure you want to request deletion for this sale? An administrator will need to approve it."
+                confirmText="Request Deletion"
+            />
         </div>
     );
 };

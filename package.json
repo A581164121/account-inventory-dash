@@ -1,5 +1,5 @@
 {
-  "name": "accounting-erp",
+  "name": "copy-of-accounting-erp",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -15,7 +15,8 @@
     "recharts": "^3.4.1",
     "react": "^19.2.0",
     "jspdf": "^2.5.1",
-    "html2canvas": "^1.4.1"
+    "html2canvas": "^1.4.1",
+    "@supabase/supabase-js": "^2.82.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

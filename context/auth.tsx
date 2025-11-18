@@ -18,7 +18,10 @@ const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
-  const inactivityTimer = useRef<ReturnType<typeof setTimeout>>();
+  // Fix: Explicitly provide `undefined` as the initial value to `useRef`.
+  // This resolves a potential ambiguity with `useRef` overloads when a generic type is provided without an initial value,
+  // which can cause the "Expected 1 arguments, but got 0" error.
+  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   
   useEffect(() => {
     setAuthInitialized(true);

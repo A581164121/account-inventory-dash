@@ -1,17 +1,20 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { Plus, Search, Eye, Trash2, FileWarning, CheckCircle, FileDown } from 'lucide-react';
 import Modal from '../components/ui/Modal';
+import ConfirmationModal from '../components/ui/ConfirmationModal';
 import { Purchase, Permission, PaymentMethod } from '../types';
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
-import { getNextPurchaseInvoiceNumber, commitInvoiceNumber } from '../services/invoiceNumberService';
+import { getNextPurchaseInvoiceNumber } from '../services/invoiceNumberService';
 
 const Purchases: React.FC = () => {
     const { purchases, addPurchase, suppliers, products, requestDelete, companyProfile } = useAppContext();
     const { currentUser, hasPermission } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [deleteId, setDeleteId] = useState<string | null>(null);
     
     const salesTaxRate = companyProfile.salesTaxRate || 0;
     const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -36,7 +39,7 @@ const Purchases: React.FC = () => {
         } else if (!supplierId) {
             setInvoiceNumber('');
         }
-    }, [supplierId, suppliers, purchases, isModalOpen]);
+    }, [supplierId, suppliers, isModalOpen]);
 
     const handleAddItem = () => setItems([...items, { productId: '', quantity: 1, price: 0 }]);
     const handleRemoveItem = (index: number) => setItems(items.filter((_, i) => i !== index));
@@ -68,10 +71,15 @@ const Purchases: React.FC = () => {
         setItems([{ productId: '', quantity: 1, price: 0 }]);
     }
 
-    const handleDeleteRequest = (purchaseId: string) => {
-        if (currentUser && window.confirm('Are you sure you want to request deletion for this purchase? An administrator will need to approve it.')) {
-            requestDelete('purchase', purchaseId);
+    const handleDeleteClick = (purchaseId: string) => {
+        setDeleteId(purchaseId);
+    };
+
+    const handleConfirmDelete = () => {
+        if (currentUser && deleteId) {
+            requestDelete('purchase', deleteId);
         }
+        setDeleteId(null);
     };
 
     const handleExport = () => {
@@ -106,7 +114,6 @@ const Purchases: React.FC = () => {
                 departmentId: currentUser.departmentId,
             };
             await addPurchase(newPurchaseData);
-            commitInvoiceNumber('purchase', supplierId, invoiceNumber);
             
             setIsModalOpen(false);
             resetForm();
@@ -161,7 +168,7 @@ const Purchases: React.FC = () => {
                                             <Eye size={18} />
                                         </Link>
                                          {hasPermission(Permission.REQUEST_DELETE_PURCHASE) && purchase.status === 'approved' && (
-                                            <button onClick={() => handleDeleteRequest(purchase.id)} className="text-red-500 hover:text-red-700" title="Request Deletion">
+                                            <button onClick={() => handleDeleteClick(purchase.id)} className="text-red-500 hover:text-red-700" title="Request Deletion">
                                                 <Trash2 size={18} />
                                             </button>
                                         )}
@@ -250,6 +257,15 @@ const Purchases: React.FC = () => {
                     </div>
                 </form>
             </Modal>
+
+            <ConfirmationModal
+                isOpen={!!deleteId}
+                onClose={() => setDeleteId(null)}
+                onConfirm={handleConfirmDelete}
+                title="Confirm Deletion Request"
+                message="Are you sure you want to request deletion for this purchase? An administrator will need to approve it."
+                confirmText="Request Deletion"
+            />
         </div>
     );
 };

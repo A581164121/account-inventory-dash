@@ -2,7 +2,7 @@ import React, { createContext, useState, useContext, ReactNode, useEffect } from
 // Fix: Import JournalEntryLine type to resolve type error.
 import { Customer, Supplier, Product, Sale, Purchase, Expense, JournalEntry, Account, User, Department, ActivityLog, ApprovalRequest, RecordType, ThemeColors, CompanyProfile, LogoUrl, EditLog, UserRole, JournalEntryLine } from '../types';
 import { useAuth } from './auth';
-import { initializeInvoiceSequences } from '../services/invoiceNumberService';
+import { initializeInvoiceSequences, commitInvoiceNumber } from '../services/invoiceNumberService';
 import { dbService } from '../services/storageService';
 import { fakeHash } from '../utils/auth';
 
@@ -388,6 +388,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         
         // 3. Save all changes
         await dbService.upsertItem('sales', newSale);
+        commitInvoiceNumber('sale', newSale.customerId, newSale.invoiceNumber);
         for(const p of updatedProducts) { await dbService.upsertItem('products', p); }
 
         // 4. Update state
@@ -434,6 +435,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         // 3. Save changes
         await dbService.upsertItem('purchases', newPurchase);
+        commitInvoiceNumber('purchase', newPurchase.supplierId, newPurchase.invoiceNumber);
         for (const p of updatedProducts) { await dbService.upsertItem('products', p); }
 
         // 4. Update state

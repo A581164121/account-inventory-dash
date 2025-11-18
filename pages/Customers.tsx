@@ -1,8 +1,10 @@
+
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Customer, Permission } from '../types';
 import { Plus, Search, Edit, Trash2, FileWarning, CheckCircle, FileDown, History, ArrowUp, ArrowDown } from 'lucide-react';
 import Modal from '../components/ui/Modal';
+import ConfirmationModal from '../components/ui/ConfirmationModal';
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
 import RecordHistoryModal from '../components/ui/RecordHistoryModal';
@@ -60,6 +62,7 @@ const Customers: React.FC = () => {
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>(undefined);
     const [searchQuery, setSearchQuery] = useState('');
+    const [deleteId, setDeleteId] = useState<string | null>(null);
     
     type SortableKeys = 'name' | 'email';
     const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
@@ -85,10 +88,15 @@ const Customers: React.FC = () => {
         setIsHistoryModalOpen(true);
     };
 
-    const handleDeleteRequest = (id: string) => {
-        if (currentUser && window.confirm('Are you sure you want to request deletion for this customer? An administrator will need to approve it.')) {
-            requestDelete('customer', id);
+    const handleDeleteClick = (id: string) => {
+        setDeleteId(id);
+    };
+
+    const handleConfirmDelete = () => {
+        if (currentUser && deleteId) {
+            requestDelete('customer', deleteId);
         }
+        setDeleteId(null);
     };
     
     const requestSort = (key: SortableKeys) => {
@@ -196,7 +204,7 @@ const Customers: React.FC = () => {
                                         {hasPermission(Permission.VIEW_AUDIT_TRAIL) && <button onClick={() => handleViewHistory(customer)} className="text-gray-500 hover:text-gray-700" title="View History"><History size={18} /></button>}
                                         {hasPermission(Permission.EDIT_CUSTOMER) && <button onClick={() => handleEdit(customer)} className="text-blue-500 hover:text-blue-700" title="Edit"><Edit size={18} /></button>}
                                         {hasPermission(Permission.REQUEST_DELETE_CUSTOMER) && customer.status !== 'pending_deletion' && (
-                                          <button onClick={() => handleDeleteRequest(customer.id)} className="text-red-500 hover:text-red-700" title="Request Deletion"><Trash2 size={18} /></button>
+                                          <button onClick={() => handleDeleteClick(customer.id)} className="text-red-500 hover:text-red-700" title="Request Deletion"><Trash2 size={18} /></button>
                                         )}
                                     </td>
                                 </tr>
@@ -213,6 +221,15 @@ const Customers: React.FC = () => {
                     onCancel={() => { setIsModalOpen(false); setEditingCustomer(undefined); }}
                 />
             </Modal>
+            
+            <ConfirmationModal
+                isOpen={!!deleteId}
+                onClose={() => setDeleteId(null)}
+                onConfirm={handleConfirmDelete}
+                title="Confirm Deletion Request"
+                message="Are you sure you want to request deletion for this customer? An administrator will need to approve it."
+                confirmText="Request Deletion"
+            />
 
             {editingCustomer && (
               <RecordHistoryModal

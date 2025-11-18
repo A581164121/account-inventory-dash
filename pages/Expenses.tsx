@@ -1,8 +1,10 @@
+
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Expense, Permission } from '../types';
 import { Plus, Edit, Trash2, FileWarning, CheckCircle, FileDown, History } from 'lucide-react';
 import Modal from '../components/ui/Modal';
+import ConfirmationModal from '../components/ui/ConfirmationModal';
 import { useAuth } from '../context/auth';
 import { exportToCsv } from '../services/exportService';
 import RecordHistoryModal from '../components/ui/RecordHistoryModal';
@@ -60,6 +62,7 @@ const Expenses: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingExpense, setEditingExpense] = useState<Expense | undefined>(undefined);
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [deleteId, setDeleteId] = useState<string | null>(null);
     
     const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
     const activeExpenses = useMemo(() => expenses.filter(e => !e.isDeleted), [expenses]);
@@ -69,9 +72,13 @@ const Expenses: React.FC = () => {
         if ('id' in expense) {
             await updateExpense(expense);
         } else {
-            const newExpenseData = expense as Omit<Expense, 'id' | 'status' | 'createdBy' | 'isDeleted' | 'createdAt'|'createdBy' | 'editHistory' | 'departmentId'>;
-            
-            await addExpense({ ...newExpenseData, departmentId: currentUser.departmentId });
+            // Fix: Construct the new expense object correctly to satisfy the `addExpense` type signature.
+            const newExpenseData: Omit<Expense, 'id' | 'isDeleted' | 'createdAt' | 'createdBy' | 'editHistory'> = {
+                ...(expense as Omit<Expense, 'id'>), // Cast to remove id property from type
+                status: 'approved', // Add the required status property
+                departmentId: currentUser.departmentId,
+            };
+            await addExpense(newExpenseData);
         }
 
         setIsModalOpen(false);
@@ -88,10 +95,15 @@ const Expenses: React.FC = () => {
         setIsHistoryModalOpen(true);
     };
 
-    const handleDeleteRequest = (expenseId: string) => {
-        if (currentUser && window.confirm('Are you sure you want to request deletion for this expense? An administrator will need to approve it.')) {
-            requestDelete('expense', expenseId);
+    const handleDeleteClick = (id: string) => {
+        setDeleteId(id);
+    };
+
+    const handleConfirmDelete = () => {
+        if (currentUser && deleteId) {
+            requestDelete('expense', deleteId);
         }
+        setDeleteId(null);
     };
 
     const handleExport = () => {
@@ -141,7 +153,7 @@ const Expenses: React.FC = () => {
                                     <td className="p-4 text-right no-print space-x-2">
                                         {hasPermission(Permission.VIEW_AUDIT_TRAIL) && <button onClick={() => handleViewHistory(expense)} className="text-gray-500 hover:text-gray-700" title="View History"><History size={18} /></button>}
                                         {hasPermission(Permission.EDIT_EXPENSE) && <button onClick={() => handleEdit(expense)} className="text-blue-500 hover:text-blue-700"><Edit size={18} /></button>}
-                                        {hasPermission(Permission.REQUEST_DELETE_EXPENSE) && expense.status !== 'pending_deletion' && <button onClick={() => handleDeleteRequest(expense.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18} /></button>}
+                                        {hasPermission(Permission.REQUEST_DELETE_EXPENSE) && expense.status !== 'pending_deletion' && <button onClick={() => handleDeleteClick(expense.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18} /></button>}
                                     </td>
                                 </tr>
                             ))}
@@ -158,6 +170,15 @@ const Expenses: React.FC = () => {
                 />
             </Modal>
             
+            <ConfirmationModal
+                isOpen={!!deleteId}
+                onClose={() => setDeleteId(null)}
+                onConfirm={handleConfirmDelete}
+                title="Confirm Deletion Request"
+                message="Are you sure you want to request deletion for this expense? An administrator will need to approve it."
+                confirmText="Request Deletion"
+            />
+
             {editingExpense && (
               <RecordHistoryModal
                 isOpen={isHistoryModalOpen}

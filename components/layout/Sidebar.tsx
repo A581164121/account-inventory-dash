@@ -47,8 +47,8 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
 
   return (
     <>
-      <div className={`fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`} onClick={() => setSidebarOpen(false)}></div>
-      <div className={`fixed inset-y-0 left-0 w-64 bg-white dark:bg-dark-secondary transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 transition-transform duration-200 ease-in-out z-30 flex flex-col`}>
+      <div className={`fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden ${sidebarOpen ? 'block' : 'hidden'} no-print`} onClick={() => setSidebarOpen(false)}></div>
+      <div className={`fixed inset-y-0 left-0 w-64 bg-white dark:bg-dark-secondary transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 transition-transform duration-200 ease-in-out z-30 flex flex-col no-print`}>
         <div className="flex items-center justify-center p-6">
           <Logo src={logoUrl} />
         </div>
